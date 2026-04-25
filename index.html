@@ -3,15 +3,41 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Paisa Tracker Voice</title>
+
+<title>Paisa Tracker</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#10b981">
 
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
 
 <style>
-body { font-family: 'IBM Plex Sans', sans-serif; background:#0f172a; color:#e2e8f0; }
-.listening { animation: pulse 1s infinite; }
-@keyframes pulse { 0%{opacity:1} 50%{opacity:.5} 100%{opacity:1} }
+body {
+  font-family: system-ui, sans-serif;
+  background:#0f172a;
+  color:#e2e8f0;
+}
+
+.card {
+  background:#1e293b;
+  border-radius:14px;
+  padding:12px;
+  margin-bottom:10px;
+}
+
+button {
+  cursor:pointer;
+}
+
+.listening {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%{opacity:1}
+  50%{opacity:.5}
+  100%{opacity:1}
+}
 </style>
 </head>
 
@@ -19,193 +45,201 @@ body { font-family: 'IBM Plex Sans', sans-serif; background:#0f172a; color:#e2e8
 
 <div class="max-w-md mx-auto">
 
-<h1 class="text-xl font-bold mb-4">Paisa Tracker (Voice)</h1>
+<h1 class="text-xl font-bold mb-4">💰 Paisa Tracker</h1>
 
 <!-- INPUT -->
-<input id="textInput"
-class="w-full p-3 rounded bg-slate-800 mb-3"
-placeholder="bolain: petrol 500 ya chai 200"
+<input id="input"
+class="w-full p-3 rounded bg-slate-800 mb-3 outline-none"
+placeholder="bolain: chai 200, petrol 1000"
 />
 
-<!-- MIC -->
-<button id="micBtn"
-class="w-full p-4 rounded bg-red-500 font-bold">
-🎤 Tap to Speak
+<button onclick="addFromText()"
+class="w-full bg-emerald-500 text-black font-bold p-3 rounded mb-3">
+Add Entry
 </button>
 
-<p id="status" class="mt-2 text-sm opacity-70"></p>
+<!-- VOICE -->
+<button id="micBtn"
+class="w-full bg-red-500 text-white font-bold p-3 rounded mb-2"
+onclick="toggleVoice()">
+🎤 Voice Input
+</button>
 
-<!-- OUTPUT -->
-<div id="log" class="mt-6 space-y-2"></div>
+<p id="status" class="text-sm opacity-60 mb-4"></p>
+
+<!-- LIST -->
+<div id="list"></div>
 
 </div>
 
 <script>
+
 // =====================
-// SAFE NORMALIZER
+// STORAGE
 // =====================
-function normalize(text){
-  return text
-    .toLowerCase()
-    .replace(/[,\.\-\_]/g,' ')
+function getData(){
+  return JSON.parse(localStorage.getItem("entries") || "[]");
+}
+
+function saveData(data){
+  localStorage.setItem("entries", JSON.stringify(data));
+}
+
+// =====================
+// CLEAN INPUT
+// =====================
+function clean(text){
+  return text.toLowerCase()
+    .replace(/[^\w\s\d]/g,' ')
     .replace(/\s+/g,' ')
     .trim();
 }
 
 // =====================
-// URDU + ROMAN CLEANER
+// AMOUNT
 // =====================
-function cleanVoice(text){
-  if(!text) return '';
-
-  return normalize(text)
-    .replace(/ٹرانسپورٹ|transport/g,'uber')
-    .replace(/پٹرول|petrol/g,'petrol')
-    .replace(/چائے|chai/g,'chai')
-    .replace(/روپے|rs|pkr/g,'')
-    .trim();
+function amount(text){
+  const m = text.match(/(\d+)/);
+  return m ? parseInt(m[1]) : 0;
 }
 
 // =====================
-// AMOUNT PARSER
+// TYPE
 // =====================
-function extractAmount(text){
-  const match = text.match(/(\d+(\.\d+)?)/);
-  if(!match) return 0;
-  let amt = parseFloat(match[1]);
+function type(text){
+  const income = ['mila','kamaya','received'];
+  const expense = ['chai','petrol','uber','kharcha'];
 
-  if(text.includes('k')) amt *= 1000;
+  if(income.some(k=>text.includes(k))) return "income";
+  if(expense.some(k=>text.includes(k))) return "expense";
 
-  return amt;
-}
-
-// =====================
-// TYPE DETECTION
-// =====================
-function detectType(text){
-  const income = ['mila','kamaya','received','income'];
-  const expense = ['kharcha','paid','spent','petrol','chai','uber','food'];
-
-  if(income.some(k => text.includes(k))) return 'income';
-  if(expense.some(k => text.includes(k))) return 'expense';
-
-  return 'expense'; // default safer
+  return "expense";
 }
 
 // =====================
 // CATEGORY
 // =====================
 function category(text){
-  if(text.includes('petrol')) return 'fuel';
-  if(text.includes('chai')) return 'food';
-  if(text.includes('uber')) return 'transport';
-  return 'other';
+  if(text.includes("petrol")) return "fuel";
+  if(text.includes("chai")) return "food";
+  if(text.includes("uber")) return "transport";
+  return "other";
 }
 
 // =====================
-// SPEECH ENGINE (ROBUST)
+// ADD ENTRY
 // =====================
-let recognition;
-let listening = false;
+function add(text){
 
-function startVoice(){
+  const cleanText = clean(text);
+  const amt = amount(cleanText);
 
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if(!SR){
-    alert("Speech not supported");
-    return;
-  }
-
-  recognition = new SR();
-
-  // IMPORTANT FIX:
-  // start Urdu first, fallback to English INDIAN accent (works better in Pakistan)
-  recognition.lang = 'ur-PK';
-
-  recognition.interimResults = true;
-  recognition.continuous = false;
-
-  document.getElementById('status').innerText = "Listening...";
-
-  recognition.onresult = (e)=>{
-    let transcript = e.results[0][0].transcript;
-
-    transcript = cleanVoice(transcript);
-
-    document.getElementById('textInput').value = transcript;
-
-    if(e.results[0].isFinal){
-      process(transcript);
-    }
-  };
-
-  recognition.onerror = (e)=>{
-    console.log(e);
-    document.getElementById('status').innerText = "Error: try again";
-    listening = false;
-  };
-
-  recognition.onend = ()=>{
-    listening = false;
-    document.getElementById('status').innerText = "Stopped";
-  };
-
-  recognition.start();
-  listening = true;
-}
-
-// =====================
-// PROCESS ENTRY
-// =====================
-function process(text){
-
-  const amt = extractAmount(text);
-  if(!amt){
-    alert("Amount samajh nahi aaya");
-    return;
-  }
-
-  const type = detectType(text);
-  const cat = category(text);
+  if(!amt) return alert("Amount missing");
 
   const entry = {
     text,
     amount: amt,
-    type,
-    category: cat,
-    time: new Date().toLocaleString()
+    type: type(cleanText),
+    category: category(cleanText),
+    time: new Date().toISOString()
   };
 
-  render(entry);
+  const data = getData();
+  data.unshift(entry);
+  saveData(data);
+
+  render();
 }
 
 // =====================
 // UI RENDER
 // =====================
-function render(e){
-  const div = document.createElement('div');
-  div.className = "p-3 bg-slate-800 rounded";
+function render(){
 
-  div.innerHTML = `
-    <b>${e.type.toUpperCase()}</b> - ${e.category}<br/>
-    Rs ${e.amount}<br/>
-    <small>${e.text}</small>
-  `;
+  const list = document.getElementById("list");
+  const data = getData();
 
-  document.getElementById('log').prepend(div);
+  list.innerHTML = "";
+
+  data.forEach(e=>{
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <b>${e.type.toUpperCase()}</b><br/>
+      ${e.category} - Rs ${e.amount}<br/>
+      <small>${e.text}</small>
+    `;
+
+    list.appendChild(div);
+  });
 }
 
 // =====================
-// EVENTS
+// TEXT INPUT
 // =====================
-document.getElementById('micBtn').onclick = startVoice;
+function addFromText(){
+  const val = document.getElementById("input").value;
+  if(!val) return;
+  add(val);
+  document.getElementById("input").value = "";
+}
 
-document.getElementById('textInput').addEventListener('keydown',(e)=>{
-  if(e.key==='Enter'){
-    process(e.target.value);
+// =====================
+// VOICE INPUT (FIXED)
+// =====================
+let recognition;
+let listening = false;
+
+function toggleVoice(){
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SR){
+    alert("Voice not supported");
+    return;
   }
-});
+
+  recognition = new SR();
+
+  recognition.lang = 'ur-PK';
+  recognition.interimResults = true;
+
+  document.getElementById("status").innerText = "Listening...";
+
+  recognition.onresult = (e)=>{
+    let text = e.results[0][0].transcript;
+    text = clean(text);
+
+    document.getElementById("input").value = text;
+
+    if(e.results[0].isFinal){
+      add(text);
+    }
+  };
+
+  recognition.onerror = ()=>{
+    document.getElementById("status").innerText = "Error, try again";
+  };
+
+  recognition.onend = ()=>{
+    document.getElementById("status").innerText = "";
+  };
+
+  recognition.start();
+}
+
+// =====================
+// INIT
+// =====================
+window.onload = render;
+
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js');
+}
 </script>
 
 </body>
