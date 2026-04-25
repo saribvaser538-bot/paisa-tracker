@@ -1,259 +1,244 @@
 <!doctype html>
 <html lang="ur">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-<title>Paisa Tracker AI</title>
-
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#10b981">
+<title>Paisa Tracker Pro</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 
 <style>
-body { background:#0f172a; color:#e2e8f0; font-family:system-ui; }
-.card { background:#1e293b; padding:12px; border-radius:12px; margin-bottom:10px; }
-button { cursor:pointer; }
-.listening { animation:pulse 1s infinite; }
-@keyframes pulse { 0%{opacity:1} 50%{opacity:.5} 100%{opacity:1} }
-.small { font-size:12px; opacity:.7; }
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at top, #0f172a, #020617);
+  color:white;
+}
+
+/* container */
+.wrap{
+  max-width:420px;
+  margin:0 auto;
+  padding:16px;
+}
+
+/* header */
+h1{
+  font-size:22px;
+  font-weight:700;
+  letter-spacing:-0.5px;
+}
+
+/* cards */
+.card{
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+  border-radius:16px;
+  padding:14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+/* inputs */
+input{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  background: rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
+  color:white;
+  outline:none;
+}
+
+/* button */
+button{
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  background: linear-gradient(135deg,#10b981,#059669);
+  color:black;
+  font-weight:700;
+  margin-top:10px;
+  box-shadow: 0 10px 20px rgba(16,185,129,0.2);
+}
+
+/* grid stats */
+.grid3{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-top:16px;
+}
+
+.stat{
+  padding:12px;
+  border-radius:14px;
+  background: rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06);
+  text-align:center;
+}
+
+.label{
+  font-size:11px;
+  opacity:0.6;
+}
+
+.value{
+  font-size:16px;
+  font-weight:700;
+  margin-top:4px;
+}
+
+/* list */
+.item{
+  padding:12px;
+  border-radius:14px;
+  background: rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.06);
+  margin-top:10px;
+}
+
+.tag{
+  font-size:11px;
+  opacity:0.6;
+}
+
+.amount{
+  font-weight:700;
+  margin-top:4px;
+}
 </style>
 </head>
 
-<body class="p-4">
+<body>
 
-<div class="max-w-md mx-auto">
+<div class="wrap">
 
-<h1 class="text-xl font-bold mb-3">💰 Paisa Tracker AI</h1>
+  <h1>💰 Paisa Tracker</h1>
+  <p style="opacity:0.5;font-size:13px;margin-top:4px;">
+    Voice-free MVP • Offline finance tracker
+  </p>
 
-<input id="input"
-class="w-full p-3 rounded bg-slate-800 mb-2 outline-none"
-placeholder="chai 200, petrol 1000, salary 5000"
-/>
+  <div style="margin-top:14px;">
+    <input id="input" placeholder="petrol 500, chai 100, salary 20000"/>
+    <button onclick="add()">Add Transaction</button>
+  </div>
 
-<button onclick="addText()"
-class="w-full bg-emerald-500 text-black font-bold p-3 rounded mb-2">
-Add Entry
-</button>
+  <!-- STATS -->
+  <div class="grid3">
+    <div class="stat">
+      <div class="label">Income</div>
+      <div class="value" id="income">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Expense</div>
+      <div class="value" id="expense">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Net</div>
+      <div class="value" id="net">0</div>
+    </div>
+  </div>
 
-<button id="micBtn" onclick="voice()"
-class="w-full bg-red-500 text-white font-bold p-3 rounded mb-3">
-🎤 Voice
-</button>
-
-<p id="status" class="small"></p>
-
-<div id="list"></div>
+  <!-- LIST -->
+  <div id="list" style="margin-top:16px;"></div>
 
 </div>
 
 <script>
 
-// =========================
-// STORAGE
-// =========================
-function getData(){
-  return JSON.parse(localStorage.getItem("entries") || "[]");
-}
-function saveData(d){
-  localStorage.setItem("entries", JSON.stringify(d));
+let data = JSON.parse(localStorage.getItem("data") || "[]");
+
+function norm(t){
+  return t.toLowerCase().trim();
 }
 
-// =========================
-// "AI MEMORY" (no API)
-// learns from corrections
-// =========================
-function getMemory(){
-  return JSON.parse(localStorage.getItem("ai_memory") || "{}");
-}
-function saveMemory(mem){
-  localStorage.setItem("ai_memory", JSON.stringify(mem));
+function amount(t){
+  let m = t.match(/(\d+)/);
+  return m ? parseInt(m[1]) : 0;
 }
 
-// =========================
-// CLEAN TEXT
-// =========================
-function clean(t){
-  return t.toLowerCase()
-    .replace(/[^\w\s\d]/g,' ')
-    .replace(/\s+/g,' ')
-    .trim();
-}
+function type(t){
 
-// =========================
-// SMART TYPE DETECTION (rules + memory)
-// =========================
-function detectType(text){
-  const t = clean(text);
-  const mem = getMemory();
+  const income = ["salary","income","kamai","mila","received","bonus"];
+  const expense = ["petrol","fuel","chai","food","khana","uber","careem","bus","bill","rent"];
 
-  if(mem[t]?.type) return mem[t].type;
-
-  const income = ['salary','mila','received','kamaya','payment'];
-  const expense = ['chai','petrol','food','uber','bill','kharcha'];
-
-  if(income.some(k=>t.includes(k))) return "income";
-  if(expense.some(k=>t.includes(k))) return "expense";
+  if(income.some(w=>t.includes(w))) return "income";
+  if(expense.some(w=>t.includes(w))) return "expense";
 
   return "expense";
 }
 
-// =========================
-// SMART CATEGORY (rules + learning)
-// =========================
-function detectCategory(text){
-  const t = clean(text);
-  const mem = getMemory();
+function category(t){
+  if(t.includes("petrol")||t.includes("fuel")) return "Fuel ⛽";
+  if(t.includes("chai")||t.includes("food")) return "Food 🍵";
+  if(t.includes("uber")||t.includes("bus")) return "Transport 🚗";
+  if(t.includes("salary")) return "Income 💰";
+  return "Other 📦";
+}
 
-  if(mem[t]?.category) return mem[t].category;
+function add(){
 
-  const map = {
-    fuel:['petrol','fuel','gas'],
-    food:['chai','food','biryani','hotel'],
-    transport:['uber','careem','bus','ride'],
-    bills:['bill','electricity','internet'],
-  };
+  let raw = document.getElementById("input").value;
+  let t = norm(raw);
 
-  for(let k in map){
-    if(map[k].some(x=>t.includes(x))) return k;
+  let amt = amount(t);
+  if(!amt){
+    alert("Amount missing");
+    return;
   }
 
-  return "other";
-}
-
-// =========================
-// AMOUNT
-// =========================
-function amount(t){
-  const m = t.match(/(\d+)/);
-  return m ? parseInt(m[1]) : 0;
-}
-
-// =========================
-// ADD ENTRY
-// =========================
-function add(text){
-
-  const t = clean(text);
-  const amt = amount(t);
-  if(!amt) return;
-
-  const entry = {
-    text,
+  let item = {
+    text: raw,
     amount: amt,
-    type: detectType(t),
-    category: detectCategory(t),
-    time: Date.now()
+    type: type(t),
+    category: category(t)
   };
 
-  const data = getData();
-  data.unshift(entry);
-  saveData(data);
+  data.push(item);
+  localStorage.setItem("data", JSON.stringify(data));
 
+  document.getElementById("input").value = "";
   render();
 }
 
-// =========================
-// LEARNING SYSTEM (AI replacement)
-// user correction = memory update
-// =========================
-function correct(index, newType, newCat){
+function calc(){
 
-  const data = getData();
-  const item = data[index];
+  let income = 0;
+  let expense = 0;
 
-  const mem = getMemory();
-  const key = clean(item.text);
+  data.forEach(d=>{
+    if(d.type==="income") income += d.amount;
+    else expense += d.amount;
+  });
 
-  mem[key] = {
-    type: newType,
-    category: newCat
-  };
-
-  saveMemory(mem);
-
-  item.type = newType;
-  item.category = newCat;
-
-  saveData(data);
-  render();
+  document.getElementById("income").innerText = income;
+  document.getElementById("expense").innerText = expense;
+  document.getElementById("net").innerText = income - expense;
 }
 
-// =========================
-// RENDER
-// =========================
 function render(){
 
-  const list = document.getElementById("list");
-  const data = getData();
-
+  let list = document.getElementById("list");
   list.innerHTML = "";
 
-  data.forEach((e,i)=>{
+  data.slice().reverse().forEach(d=>{
 
-    const div = document.createElement("div");
-    div.className = "card";
+    let div = document.createElement("div");
+    div.className = "item";
 
     div.innerHTML = `
-      <b>${e.type}</b> - ${e.category}<br/>
-      Rs ${e.amount}<br/>
-      <div class="small">${e.text}</div>
-
-      <button onclick="correct(${i},'income','${e.category}')"
-      class="text-green-400 text-xs mt-2">Mark Income</button>
-
-      <button onclick="correct(${i},'expense','${e.category}')"
-      class="text-red-400 text-xs ml-2">Mark Expense</button>
+      <div style="font-weight:600">${d.text}</div>
+      <div class="tag">${d.category} • ${d.type}</div>
+      <div class="amount">Rs ${d.amount}</div>
     `;
 
     list.appendChild(div);
   });
+
+  calc();
 }
 
-// =========================
-// INPUT
-// =========================
-function addText(){
-  const v = document.getElementById("input").value;
-  if(!v) return;
-  add(v);
-  document.getElementById("input").value = "";
-}
-
-// =========================
-// VOICE (stable version)
-// =========================
-let rec;
-
-function voice(){
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR) return alert("No voice support");
-
-  rec = new SR();
-  rec.lang = 'ur-PK';
-  rec.interimResults = true;
-
-  document.getElementById("status").innerText = "Listening...";
-
-  rec.onresult = (e)=>{
-    let t = e.results[0][0].transcript;
-    document.getElementById("input").value = t;
-
-    if(e.results[0].isFinal){
-      add(t);
-    }
-  };
-
-  rec.onend = ()=>{
-    document.getElementById("status").innerText = "";
-  };
-
-  rec.start();
-}
-
-// INIT
 render();
 
 </script>
