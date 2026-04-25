@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-<title>Paisa Tracker</title>
+<title>Paisa Tracker AI</title>
 
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#10b981">
@@ -12,32 +12,12 @@
 <script src="https://cdn.tailwindcss.com"></script>
 
 <style>
-body {
-  font-family: system-ui, sans-serif;
-  background:#0f172a;
-  color:#e2e8f0;
-}
-
-.card {
-  background:#1e293b;
-  border-radius:14px;
-  padding:12px;
-  margin-bottom:10px;
-}
-
-button {
-  cursor:pointer;
-}
-
-.listening {
-  animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-  0%{opacity:1}
-  50%{opacity:.5}
-  100%{opacity:1}
-}
+body { background:#0f172a; color:#e2e8f0; font-family:system-ui; }
+.card { background:#1e293b; padding:12px; border-radius:12px; margin-bottom:10px; }
+button { cursor:pointer; }
+.listening { animation:pulse 1s infinite; }
+@keyframes pulse { 0%{opacity:1} 50%{opacity:.5} 100%{opacity:1} }
+.small { font-size:12px; opacity:.7; }
 </style>
 </head>
 
@@ -45,103 +25,126 @@ button {
 
 <div class="max-w-md mx-auto">
 
-<h1 class="text-xl font-bold mb-4">💰 Paisa Tracker</h1>
+<h1 class="text-xl font-bold mb-3">💰 Paisa Tracker AI</h1>
 
-<!-- INPUT -->
 <input id="input"
-class="w-full p-3 rounded bg-slate-800 mb-3 outline-none"
-placeholder="bolain: chai 200, petrol 1000"
+class="w-full p-3 rounded bg-slate-800 mb-2 outline-none"
+placeholder="chai 200, petrol 1000, salary 5000"
 />
 
-<button onclick="addFromText()"
-class="w-full bg-emerald-500 text-black font-bold p-3 rounded mb-3">
+<button onclick="addText()"
+class="w-full bg-emerald-500 text-black font-bold p-3 rounded mb-2">
 Add Entry
 </button>
 
-<!-- VOICE -->
-<button id="micBtn"
-class="w-full bg-red-500 text-white font-bold p-3 rounded mb-2"
-onclick="toggleVoice()">
-🎤 Voice Input
+<button id="micBtn" onclick="voice()"
+class="w-full bg-red-500 text-white font-bold p-3 rounded mb-3">
+🎤 Voice
 </button>
 
-<p id="status" class="text-sm opacity-60 mb-4"></p>
+<p id="status" class="small"></p>
 
-<!-- LIST -->
 <div id="list"></div>
 
 </div>
 
 <script>
 
-// =====================
+// =========================
 // STORAGE
-// =====================
+// =========================
 function getData(){
   return JSON.parse(localStorage.getItem("entries") || "[]");
 }
-
-function saveData(data){
-  localStorage.setItem("entries", JSON.stringify(data));
+function saveData(d){
+  localStorage.setItem("entries", JSON.stringify(d));
 }
 
-// =====================
-// CLEAN INPUT
-// =====================
-function clean(text){
-  return text.toLowerCase()
+// =========================
+// "AI MEMORY" (no API)
+// learns from corrections
+// =========================
+function getMemory(){
+  return JSON.parse(localStorage.getItem("ai_memory") || "{}");
+}
+function saveMemory(mem){
+  localStorage.setItem("ai_memory", JSON.stringify(mem));
+}
+
+// =========================
+// CLEAN TEXT
+// =========================
+function clean(t){
+  return t.toLowerCase()
     .replace(/[^\w\s\d]/g,' ')
     .replace(/\s+/g,' ')
     .trim();
 }
 
-// =====================
-// AMOUNT
-// =====================
-function amount(text){
-  const m = text.match(/(\d+)/);
-  return m ? parseInt(m[1]) : 0;
-}
+// =========================
+// SMART TYPE DETECTION (rules + memory)
+// =========================
+function detectType(text){
+  const t = clean(text);
+  const mem = getMemory();
 
-// =====================
-// TYPE
-// =====================
-function type(text){
-  const income = ['mila','kamaya','received'];
-  const expense = ['chai','petrol','uber','kharcha'];
+  if(mem[t]?.type) return mem[t].type;
 
-  if(income.some(k=>text.includes(k))) return "income";
-  if(expense.some(k=>text.includes(k))) return "expense";
+  const income = ['salary','mila','received','kamaya','payment'];
+  const expense = ['chai','petrol','food','uber','bill','kharcha'];
+
+  if(income.some(k=>t.includes(k))) return "income";
+  if(expense.some(k=>t.includes(k))) return "expense";
 
   return "expense";
 }
 
-// =====================
-// CATEGORY
-// =====================
-function category(text){
-  if(text.includes("petrol")) return "fuel";
-  if(text.includes("chai")) return "food";
-  if(text.includes("uber")) return "transport";
+// =========================
+// SMART CATEGORY (rules + learning)
+// =========================
+function detectCategory(text){
+  const t = clean(text);
+  const mem = getMemory();
+
+  if(mem[t]?.category) return mem[t].category;
+
+  const map = {
+    fuel:['petrol','fuel','gas'],
+    food:['chai','food','biryani','hotel'],
+    transport:['uber','careem','bus','ride'],
+    bills:['bill','electricity','internet'],
+  };
+
+  for(let k in map){
+    if(map[k].some(x=>t.includes(x))) return k;
+  }
+
   return "other";
 }
 
-// =====================
+// =========================
+// AMOUNT
+// =========================
+function amount(t){
+  const m = t.match(/(\d+)/);
+  return m ? parseInt(m[1]) : 0;
+}
+
+// =========================
 // ADD ENTRY
-// =====================
+// =========================
 function add(text){
 
-  const cleanText = clean(text);
-  const amt = amount(cleanText);
-
-  if(!amt) return alert("Amount missing");
+  const t = clean(text);
+  const amt = amount(t);
+  if(!amt) return;
 
   const entry = {
     text,
     amount: amt,
-    type: type(cleanText),
-    category: category(cleanText),
-    time: new Date().toISOString()
+    type: detectType(t),
+    category: detectCategory(t),
+    time: Date.now()
   };
 
   const data = getData();
@@ -151,9 +154,35 @@ function add(text){
   render();
 }
 
-// =====================
-// UI RENDER
-// =====================
+// =========================
+// LEARNING SYSTEM (AI replacement)
+// user correction = memory update
+// =========================
+function correct(index, newType, newCat){
+
+  const data = getData();
+  const item = data[index];
+
+  const mem = getMemory();
+  const key = clean(item.text);
+
+  mem[key] = {
+    type: newType,
+    category: newCat
+  };
+
+  saveMemory(mem);
+
+  item.type = newType;
+  item.category = newCat;
+
+  saveData(data);
+  render();
+}
+
+// =========================
+// RENDER
+// =========================
 function render(){
 
   const list = document.getElementById("list");
@@ -161,85 +190,72 @@ function render(){
 
   list.innerHTML = "";
 
-  data.forEach(e=>{
+  data.forEach((e,i)=>{
+
     const div = document.createElement("div");
     div.className = "card";
 
     div.innerHTML = `
-      <b>${e.type.toUpperCase()}</b><br/>
-      ${e.category} - Rs ${e.amount}<br/>
-      <small>${e.text}</small>
+      <b>${e.type}</b> - ${e.category}<br/>
+      Rs ${e.amount}<br/>
+      <div class="small">${e.text}</div>
+
+      <button onclick="correct(${i},'income','${e.category}')"
+      class="text-green-400 text-xs mt-2">Mark Income</button>
+
+      <button onclick="correct(${i},'expense','${e.category}')"
+      class="text-red-400 text-xs ml-2">Mark Expense</button>
     `;
 
     list.appendChild(div);
   });
 }
 
-// =====================
-// TEXT INPUT
-// =====================
-function addFromText(){
-  const val = document.getElementById("input").value;
-  if(!val) return;
-  add(val);
+// =========================
+// INPUT
+// =========================
+function addText(){
+  const v = document.getElementById("input").value;
+  if(!v) return;
+  add(v);
   document.getElementById("input").value = "";
 }
 
-// =====================
-// VOICE INPUT (FIXED)
-// =====================
-let recognition;
-let listening = false;
+// =========================
+// VOICE (stable version)
+// =========================
+let rec;
 
-function toggleVoice(){
+function voice(){
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) return alert("No voice support");
 
-  if(!SR){
-    alert("Voice not supported");
-    return;
-  }
-
-  recognition = new SR();
-
-  recognition.lang = 'ur-PK';
-  recognition.interimResults = true;
+  rec = new SR();
+  rec.lang = 'ur-PK';
+  rec.interimResults = true;
 
   document.getElementById("status").innerText = "Listening...";
 
-  recognition.onresult = (e)=>{
-    let text = e.results[0][0].transcript;
-    text = clean(text);
-
-    document.getElementById("input").value = text;
+  rec.onresult = (e)=>{
+    let t = e.results[0][0].transcript;
+    document.getElementById("input").value = t;
 
     if(e.results[0].isFinal){
-      add(text);
+      add(t);
     }
   };
 
-  recognition.onerror = ()=>{
-    document.getElementById("status").innerText = "Error, try again";
-  };
-
-  recognition.onend = ()=>{
+  rec.onend = ()=>{
     document.getElementById("status").innerText = "";
   };
 
-  recognition.start();
+  rec.start();
 }
 
-// =====================
 // INIT
-// =====================
-window.onload = render;
+render();
 
-</script>
-
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js');
-}
 </script>
 
 </body>
