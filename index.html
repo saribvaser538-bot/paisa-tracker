@@ -1,75 +1,97 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Voice Finance</title>
+<title>Paisa Tracker Pro</title>
 
-<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
 <style>
-body{
+body {
   margin:0;
-  font-family: system-ui;
+  font-family: Inter, sans-serif;
   background:#0b1220;
-  color:white;
+  color:#e5e7eb;
 }
 
 .container{
-  max-width:420px;
+  max-width:520px;
   margin:auto;
   padding:16px;
 }
 
 .card{
-  background:#111827;
-  border:1px solid #1f2937;
-  border-radius:14px;
-  padding:12px;
-  margin-top:10px;
+  background:#111a2e;
+  border:1px solid #1f2a44;
+  border-radius:16px;
+  padding:14px;
+  margin-bottom:12px;
 }
 
+h1{font-size:18px;margin:0;}
+.small{font-size:12px;opacity:.7}
+
+.row{display:flex;gap:10px}
+
 input{
-  width:100%;
-  padding:14px;
+  flex:1;
+  padding:12px;
   border-radius:12px;
-  background:#111827;
-  border:1px solid #1f2937;
+  border:1px solid #2a3550;
+  background:#0f172a;
   color:white;
 }
 
 button{
-  width:100%;
-  padding:14px;
+  padding:12px 14px;
   border-radius:12px;
-  margin-top:10px;
-  font-weight:700;
+  border:none;
   background:#22c55e;
-  color:black;
+  color:#000;
+  font-weight:600;
 }
 
-.mic{
+button.voice{
   background:#ef4444;
   color:white;
+  width:56px;
 }
 
-.stats{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:8px;
-  margin-top:12px;
-}
-
-.stat{
-  background:#111827;
-  border:1px solid #1f2937;
+.entry{
+  display:flex;
+  justify-content:space-between;
   padding:10px;
-  border-radius:12px;
-  text-align:center;
+  border-bottom:1px solid #1f2a44;
+  font-size:14px;
 }
 
-.small{font-size:11px;opacity:0.6}
-.big{font-weight:800}
+.tag{
+  font-size:11px;
+  opacity:.7;
+}
+
+.income{color:#22c55e}
+.expense{color:#ef4444}
+
+.bottom-ad{
+  text-align:center;
+  font-size:11px;
+  opacity:.4;
+  padding:10px;
+  border-top:1px solid #1f2a44;
+  margin-top:20px;
+}
+
+.mic-active{
+  animation:pulse 1s infinite;
+}
+
+@keyframes pulse{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.1)}
+  100%{transform:scale(1)}
+}
 </style>
 </head>
 
@@ -77,156 +99,151 @@ button{
 
 <div class="container">
 
-<h2 style="font-size:20px;font-weight:800;">💰 Voice Finance</h2>
-
-<input id="input" placeholder="chai 200, saad 500, salary 20000"/>
-
-<button onclick="add()">Add Entry</button>
-<button class="mic" onclick="voice()">🎤 Voice Input</button>
-
-<div class="stats">
-  <div class="stat">
-    <div class="small">Income</div>
-    <div class="big" id="income">0</div>
+  <div class="card">
+    <h1>Paisa Tracker</h1>
+    <div class="small">Voice + manual expense tracking (Urdu optimized)</div>
   </div>
-  <div class="stat">
-    <div class="small">Expense</div>
-    <div class="big" id="expense">0</div>
-  </div>
-  <div class="stat">
-    <div class="small">Net</div>
-    <div class="big" id="net">0</div>
-  </div>
-</div>
 
-<div id="list"></div>
+  <div class="card">
+    <div class="row">
+      <input id="text" placeholder="e.g. petrol 500, saad 1000, chai 200"/>
+      <button onclick="addText()">Add</button>
+      <button class="voice" id="mic" onclick="toggleVoice()">🎤</button>
+    </div>
+    <div class="small" id="status">Tap mic or type</div>
+  </div>
+
+  <div class="card">
+    <div><b>Summary</b></div>
+    <div class="small">Income: <span id="inc">0</span></div>
+    <div class="small">Expense: <span id="exp">0</span></div>
+    <div class="small"><b>Net: <span id="net">0</span></b></div>
+  </div>
+
+  <div class="card" id="list"></div>
+
+  <div class="bottom-ad">
+    Ad space (remove in PRO)
+  </div>
 
 </div>
 
 <script>
+let data = JSON.parse(localStorage.getItem("paisa")||"[]");
 
-let data = JSON.parse(localStorage.getItem("data") || "[]");
-
-// ---------- CLEAN TEXT ----------
-function norm(t){
-  return t.toLowerCase().replace(/\s+/g,' ').trim();
-}
-
-// ---------- AMOUNT ----------
-function getAmount(t){
-  let m = t.match(/(\d+)/);
-  return m ? parseInt(m[1]) : 0;
-}
-
-// ---------- TYPE LOGIC (IMPORTANT FIX) ----------
-function getType(t){
-
-  const income = ["salary","income","kamai","mila","received","bonus","freelance","payment"];
-  const expense = ["petrol","fuel","chai","food","khana","uber","careem","bus","rent","bill"];
-
-  if(income.some(w=>t.includes(w))) return "income";
-  if(expense.some(w=>t.includes(w))) return "expense";
-
-  // DEFAULT RULE:
-  // if unknown word like "saad 500" → treat as expense
-  return "expense";
+// ---------- NORMALIZER ----------
+function clean(t){
+  return t.toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu,' ')
+    .replace(/\s+/g,' ')
+    .trim();
 }
 
 // ---------- CATEGORY ----------
-function getCategory(t){
-
-  if(t.includes("petrol") || t.includes("fuel")) return "Fuel ⛽";
-  if(t.includes("chai") || t.includes("food") || t.includes("khana")) return "Food 🍵";
-  if(t.includes("uber") || t.includes("careem") || t.includes("bus")) return "Transport 🚗";
-  if(t.includes("salary")) return "Income 💰";
-
-  return "Other 📦";
+function category(t){
+  if(/petrol|fuel|diesel|cng/.test(t)) return "fuel";
+  if(/chai|khana|food|biryani/.test(t)) return "food";
+  if(/uber|careem|bus|rickshaw/.test(t)) return "transport";
+  return "other";
 }
 
-// ---------- ADD ENTRY ----------
-function add(){
+// ---------- INTENT FIX (IMPORTANT FIX) ----------
+function type(t){
+  if(/salary|income|mila|kamai|received/.test(t)) return "income";
+  return "expense";
+}
 
-  let raw = document.getElementById("input").value;
-  let t = norm(raw);
+// ---------- AMOUNT ----------
+function amount(t){
+  let m = t.match(/\d+/);
+  return m ? parseInt(m[0]) : 0;
+}
 
-  let amt = getAmount(t);
-  if(!amt) return alert("Amount missing");
+// ---------- ADD ----------
+function add(text){
+  text = clean(text);
+  let amt = amount(text);
+  if(!amt) return;
 
-  let item = {
-    text: raw,           // keeps "saad" etc EXACTLY as user said
+  let obj = {
+    text,
     amount: amt,
-    type: getType(t),
-    category: getCategory(t)
+    type: type(text),
+    cat: category(text),
+    time: new Date().toLocaleString()
   };
 
-  data.push(item);
-  localStorage.setItem("data", JSON.stringify(data));
-
-  document.getElementById("input").value="";
+  data.push(obj);
+  localStorage.setItem("paisa", JSON.stringify(data));
   render();
 }
 
-// ---------- VOICE INPUT ----------
-function voice(){
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR) return alert("Voice not supported");
-
-  let rec = new SR();
-
-  rec.lang = "en-US"; // more stable than ur-PK in browsers
-  rec.interimResults = false;
-
-  rec.onresult = (e)=>{
-    let text = e.results[0][0].transcript;
-    document.getElementById("input").value = text;
-    add();
-  };
-
-  rec.start();
-}
-
-// ---------- CALCULATOR ----------
-function calc(){
-
-  let income = 0;
-  let expense = 0;
-
-  data.forEach(d=>{
-    if(d.type === "income") income += d.amount;
-    else expense += d.amount;
-  });
-
-  document.getElementById("income").innerText = income;
-  document.getElementById("expense").innerText = expense;
-  document.getElementById("net").innerText = income - expense;
-}
-
-// ---------- RENDER ----------
+// ---------- UI ----------
 function render(){
-
   let list = document.getElementById("list");
   list.innerHTML = "";
 
-  data.slice().reverse().forEach(d=>{
+  let inc=0, exp=0;
 
-    let div = document.createElement("div");
-    div.className="card";
+  data.forEach(d=>{
+    if(d.type==="income") inc+=d.amount;
+    else exp+=d.amount;
 
-    div.innerHTML = `
-      <b>${d.text}</b><br>
-      ${d.category} • ${d.type}<br>
-      Rs ${d.amount}
+    let div=document.createElement("div");
+    div.className="entry";
+    div.innerHTML=`
+      <div>
+        ${d.text}
+        <div class="tag">${d.cat}</div>
+      </div>
+      <div class="${d.type}">
+        ${d.type==="income"?"+":"-"}${d.amount}
+      </div>
     `;
-
     list.appendChild(div);
   });
 
-  calc();
+  document.getElementById("inc").innerText=inc;
+  document.getElementById("exp").innerText=exp;
+  document.getElementById("net").innerText=inc-exp;
+}
+
+// ---------- INPUT ----------
+function addText(){
+  let t=document.getElementById("text").value;
+  if(t) add(t);
+  document.getElementById("text").value="";
+}
+
+// ---------- VOICE (IMPROVED BUT NOT MAGIC) ----------
+let rec;
+function toggleVoice(){
+  let mic=document.getElementById("mic");
+  let status=document.getElementById("status");
+
+  if(!rec){
+    rec = new (window.SpeechRecognition||window.webkitSpeechRecognition)();
+    rec.lang="ur-PK";
+    rec.interimResults=false;
+
+    rec.onresult=(e)=>{
+      let t=e.results[0][0].transcript;
+      status.innerText="Heard: "+t;
+      add(t);
+    };
+
+    rec.onend=()=>{
+      mic.classList.remove("mic-active");
+      status.innerText="Tap mic or type";
+    };
+  }
+
+  mic.classList.add("mic-active");
+  status.innerText="Listening...";
+  rec.start();
 }
 
 render();
-
 </script>
 
 </body>
