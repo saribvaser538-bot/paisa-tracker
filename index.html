@@ -1,147 +1,105 @@
 <!doctype html>
-<html lang="ur">
+<html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Paisa Tracker Pro</title>
+<title>Voice Finance</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 
 <style>
 body{
   margin:0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: radial-gradient(circle at top, #0f172a, #020617);
+  font-family: system-ui;
+  background:#0b1220;
   color:white;
 }
 
-/* container */
-.wrap{
+.container{
   max-width:420px;
-  margin:0 auto;
+  margin:auto;
   padding:16px;
 }
 
-/* header */
-h1{
-  font-size:22px;
-  font-weight:700;
-  letter-spacing:-0.5px;
-}
-
-/* cards */
 .card{
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
-  backdrop-filter: blur(10px);
-  border-radius:16px;
-  padding:14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  background:#111827;
+  border:1px solid #1f2937;
+  border-radius:14px;
+  padding:12px;
+  margin-top:10px;
 }
 
-/* inputs */
 input{
   width:100%;
   padding:14px;
-  border-radius:14px;
-  background: rgba(255,255,255,0.06);
-  border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;
+  background:#111827;
+  border:1px solid #1f2937;
   color:white;
-  outline:none;
 }
 
-/* button */
 button{
   width:100%;
   padding:14px;
-  border-radius:14px;
-  background: linear-gradient(135deg,#10b981,#059669);
-  color:black;
-  font-weight:700;
+  border-radius:12px;
   margin-top:10px;
-  box-shadow: 0 10px 20px rgba(16,185,129,0.2);
+  font-weight:700;
+  background:#22c55e;
+  color:black;
 }
 
-/* grid stats */
-.grid3{
+.mic{
+  background:#ef4444;
+  color:white;
+}
+
+.stats{
   display:grid;
   grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin-top:16px;
+  gap:8px;
+  margin-top:12px;
 }
 
 .stat{
-  padding:12px;
-  border-radius:14px;
-  background: rgba(255,255,255,0.04);
-  border:1px solid rgba(255,255,255,0.06);
+  background:#111827;
+  border:1px solid #1f2937;
+  padding:10px;
+  border-radius:12px;
   text-align:center;
 }
 
-.label{
-  font-size:11px;
-  opacity:0.6;
-}
-
-.value{
-  font-size:16px;
-  font-weight:700;
-  margin-top:4px;
-}
-
-/* list */
-.item{
-  padding:12px;
-  border-radius:14px;
-  background: rgba(255,255,255,0.04);
-  border:1px solid rgba(255,255,255,0.06);
-  margin-top:10px;
-}
-
-.tag{
-  font-size:11px;
-  opacity:0.6;
-}
-
-.amount{
-  font-weight:700;
-  margin-top:4px;
-}
+.small{font-size:11px;opacity:0.6}
+.big{font-weight:800}
 </style>
 </head>
 
 <body>
 
-<div class="wrap">
+<div class="container">
 
-  <h1>💰 Paisa Tracker</h1>
-  <p style="opacity:0.5;font-size:13px;margin-top:4px;">
-    Voice-free MVP • Offline finance tracker
-  </p>
+<h2 style="font-size:20px;font-weight:800;">💰 Voice Finance</h2>
 
-  <div style="margin-top:14px;">
-    <input id="input" placeholder="petrol 500, chai 100, salary 20000"/>
-    <button onclick="add()">Add Transaction</button>
+<input id="input" placeholder="chai 200, saad 500, salary 20000"/>
+
+<button onclick="add()">Add Entry</button>
+<button class="mic" onclick="voice()">🎤 Voice Input</button>
+
+<div class="stats">
+  <div class="stat">
+    <div class="small">Income</div>
+    <div class="big" id="income">0</div>
   </div>
-
-  <!-- STATS -->
-  <div class="grid3">
-    <div class="stat">
-      <div class="label">Income</div>
-      <div class="value" id="income">0</div>
-    </div>
-    <div class="stat">
-      <div class="label">Expense</div>
-      <div class="value" id="expense">0</div>
-    </div>
-    <div class="stat">
-      <div class="label">Net</div>
-      <div class="value" id="net">0</div>
-    </div>
+  <div class="stat">
+    <div class="small">Expense</div>
+    <div class="big" id="expense">0</div>
   </div>
+  <div class="stat">
+    <div class="small">Net</div>
+    <div class="big" id="net">0</div>
+  </div>
+</div>
 
-  <!-- LIST -->
-  <div id="list" style="margin-top:16px;"></div>
+<div id="list"></div>
 
 </div>
 
@@ -149,66 +107,93 @@ button{
 
 let data = JSON.parse(localStorage.getItem("data") || "[]");
 
+// ---------- CLEAN TEXT ----------
 function norm(t){
-  return t.toLowerCase().trim();
+  return t.toLowerCase().replace(/\s+/g,' ').trim();
 }
 
-function amount(t){
+// ---------- AMOUNT ----------
+function getAmount(t){
   let m = t.match(/(\d+)/);
   return m ? parseInt(m[1]) : 0;
 }
 
-function type(t){
+// ---------- TYPE LOGIC (IMPORTANT FIX) ----------
+function getType(t){
 
-  const income = ["salary","income","kamai","mila","received","bonus"];
-  const expense = ["petrol","fuel","chai","food","khana","uber","careem","bus","bill","rent"];
+  const income = ["salary","income","kamai","mila","received","bonus","freelance","payment"];
+  const expense = ["petrol","fuel","chai","food","khana","uber","careem","bus","rent","bill"];
 
   if(income.some(w=>t.includes(w))) return "income";
   if(expense.some(w=>t.includes(w))) return "expense";
 
+  // DEFAULT RULE:
+  // if unknown word like "saad 500" → treat as expense
   return "expense";
 }
 
-function category(t){
-  if(t.includes("petrol")||t.includes("fuel")) return "Fuel ⛽";
-  if(t.includes("chai")||t.includes("food")) return "Food 🍵";
-  if(t.includes("uber")||t.includes("bus")) return "Transport 🚗";
+// ---------- CATEGORY ----------
+function getCategory(t){
+
+  if(t.includes("petrol") || t.includes("fuel")) return "Fuel ⛽";
+  if(t.includes("chai") || t.includes("food") || t.includes("khana")) return "Food 🍵";
+  if(t.includes("uber") || t.includes("careem") || t.includes("bus")) return "Transport 🚗";
   if(t.includes("salary")) return "Income 💰";
+
   return "Other 📦";
 }
 
+// ---------- ADD ENTRY ----------
 function add(){
 
   let raw = document.getElementById("input").value;
   let t = norm(raw);
 
-  let amt = amount(t);
-  if(!amt){
-    alert("Amount missing");
-    return;
-  }
+  let amt = getAmount(t);
+  if(!amt) return alert("Amount missing");
 
   let item = {
-    text: raw,
+    text: raw,           // keeps "saad" etc EXACTLY as user said
     amount: amt,
-    type: type(t),
-    category: category(t)
+    type: getType(t),
+    category: getCategory(t)
   };
 
   data.push(item);
   localStorage.setItem("data", JSON.stringify(data));
 
-  document.getElementById("input").value = "";
+  document.getElementById("input").value="";
   render();
 }
 
+// ---------- VOICE INPUT ----------
+function voice(){
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) return alert("Voice not supported");
+
+  let rec = new SR();
+
+  rec.lang = "en-US"; // more stable than ur-PK in browsers
+  rec.interimResults = false;
+
+  rec.onresult = (e)=>{
+    let text = e.results[0][0].transcript;
+    document.getElementById("input").value = text;
+    add();
+  };
+
+  rec.start();
+}
+
+// ---------- CALCULATOR ----------
 function calc(){
 
   let income = 0;
   let expense = 0;
 
   data.forEach(d=>{
-    if(d.type==="income") income += d.amount;
+    if(d.type === "income") income += d.amount;
     else expense += d.amount;
   });
 
@@ -217,6 +202,7 @@ function calc(){
   document.getElementById("net").innerText = income - expense;
 }
 
+// ---------- RENDER ----------
 function render(){
 
   let list = document.getElementById("list");
@@ -225,12 +211,12 @@ function render(){
   data.slice().reverse().forEach(d=>{
 
     let div = document.createElement("div");
-    div.className = "item";
+    div.className="card";
 
     div.innerHTML = `
-      <div style="font-weight:600">${d.text}</div>
-      <div class="tag">${d.category} • ${d.type}</div>
-      <div class="amount">Rs ${d.amount}</div>
+      <b>${d.text}</b><br>
+      ${d.category} • ${d.type}<br>
+      Rs ${d.amount}
     `;
 
     list.appendChild(div);
