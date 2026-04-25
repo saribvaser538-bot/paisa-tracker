@@ -1,255 +1,293 @@
 <!doctype html>
-<html lang="en">
+<html lang="ur">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Paisa Tracker</title>
+<title>Paisa Tracker Pro</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
 
 <style>
 body{
   margin:0;
-  font-family:system-ui, sans-serif;
-  background:#0b1220;
-  color:#e5e7eb;
+  font-family: system-ui;
+  background: radial-gradient(circle at top, #0f172a, #020617);
+  color:white;
 }
 
-.container{
-  max-width:520px;
-  margin:auto;
-  padding:16px;
-}
+.wrap{max-width:420px;margin:auto;padding:16px}
+
+h1{font-size:22px;font-weight:800}
 
 .card{
-  background:#111a2e;
-  border:1px solid #1f2a44;
-  border-radius:14px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
   padding:14px;
-  margin-bottom:12px;
+  margin-top:10px;
 }
 
-h1{margin:0;font-size:18px}
-
-.row{display:flex;gap:8px}
-
 input{
-  flex:1;
-  padding:12px;
-  border-radius:10px;
-  border:1px solid #2a3550;
-  background:#0f172a;
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
   color:white;
+  outline:none;
 }
 
 button{
-  padding:12px 14px;
+  width:100%;
+  padding:14px;
+  border-radius:14px;
+  margin-top:10px;
+  background:linear-gradient(135deg,#10b981,#059669);
+  font-weight:800;
+  color:black;
   border:none;
-  border-radius:10px;
-  background:#22c55e;
-  font-weight:600;
 }
 
-.voice{
+.mic{
   background:#ef4444;
   color:white;
-  width:54px;
 }
 
-.entry{
-  display:flex;
-  justify-content:space-between;
-  padding:10px;
-  border-bottom:1px solid #1f2a44;
-  font-size:14px;
+.stats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-top:14px;
 }
 
-.small{font-size:12px;opacity:.7}
-.tag{font-size:11px;opacity:.6}
-
-.income{color:#22c55e}
-.expense{color:#ef4444}
-
-.ad{
+.stat{
+  background:rgba(255,255,255,0.05);
+  padding:12px;
+  border-radius:14px;
   text-align:center;
-  font-size:11px;
-  opacity:.4;
-  padding:10px;
-  border-top:1px solid #1f2a44;
 }
+
+.small{font-size:11px;opacity:0.6}
+.big{font-weight:800}
+
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<div class="wrap">
 
-  <div class="card">
-    <h1>Paisa Tracker</h1>
-    <div class="small">Voice + manual tracker (stable logic build)</div>
-  </div>
+<h1>💰 Paisa Tracker</h1>
 
-  <div class="card">
-    <div class="row">
-      <input id="text" placeholder="petrol 500, saad ne 1000 diya, chai 200"/>
-      <button onclick="addText()">Add</button>
-      <button class="voice" onclick="toggleVoice()">🎤</button>
-    </div>
-    <div class="small" id="status">Ready</div>
-  </div>
+<input id="input" placeholder="chai 100, petrol 500, salary 20000"/>
 
-  <div class="card">
-    <div><b>Summary</b></div>
-    <div class="small">Income: <span id="inc">0</span></div>
-    <div class="small">Expense: <span id="exp">0</span></div>
-    <div class="small"><b>Net: <span id="net">0</span></b></div>
-  </div>
+<button onclick="add()">Add Entry</button>
+<button class="mic" onclick="toggleVoice()">🎤 Voice Input</button>
 
-  <div class="card" id="list"></div>
+<div class="stats">
+  <div class="stat"><div class="small">Income</div><div class="big" id="income">0</div></div>
+  <div class="stat"><div class="small">Expense</div><div class="big" id="expense">0</div></div>
+  <div class="stat"><div class="small">Net</div><div class="big" id="net">0</div></div>
+</div>
 
-  <div class="ad">Ad space (PRO removes this)</div>
+<div id="list"></div>
 
 </div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("paisa") || "[]");
 
-// ---------- CLEAN ----------
-function clean(t){
-  return t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
+let data = JSON.parse(localStorage.getItem("data") || "[]");
+
+/* =========================
+   🔥 VOICE CLEANER (IMPORTANT)
+========================= */
+function cleanText(text){
+  return text
+    .toLowerCase()
+    .replace(/rupees|rupay|rs|pkr|pakistani|currency/g,'')
+    .replace(/for|mein|ka|ki|ke|pe|par/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
 }
 
-// ---------- AMOUNT ----------
-function amount(t){
-  let m = t.match(/\d+/);
-  return m ? parseInt(m[0]) : 0;
+/* =========================
+   AMOUNT DETECTION
+========================= */
+function getAmount(t){
+  const m = t.match(/(\d+)/);
+  return m ? parseInt(m[1]) : 0;
 }
 
-// ---------- CATEGORY ----------
-function category(t){
-  if(/petrol|fuel|diesel|cng/.test(t)) return "fuel";
-  if(/chai|khana|food|biryani|hotel/.test(t)) return "food";
-  if(/uber|careem|bus|rickshaw/.test(t)) return "transport";
-  if(/bill|bijli|mobile|internet/.test(t)) return "bills";
-  if(/doctor|medicine/.test(t)) return "medical";
-  return "other";
-}
+/* =========================
+   FIXED TYPE DETECTION (IMPORTANT FIX)
+========================= */
+function getType(t){
 
-// ---------- INTENT ENGINE (FIXED PROPERLY) ----------
-function type(t){
-  t = clean(t);
-
-  // MONEY COMING IN
-  const incomeRules = [
-    "mila","mil gaya","received","aaya","diya","bheja",
-    "salary","income","kamai","bonus","refund"
+  const incomeWords = [
+    "salary","income","kamai","mila","received","bonus",
+    "bheja","payment","freelance","earning","profit"
   ];
 
-  // MONEY GOING OUT
-  const expenseRules = [
-    "kharcha","lag gaye","spent","paid","kata","cut",
-    "petrol","chai","food","uber","careem","bill"
+  const expenseWords = [
+    "petrol","fuel","chai","food","khana","uber","careem",
+    "bus","rickshaw","bill","rent","shopping","medicine"
   ];
 
-  let incomeScore = 0;
-  let expenseScore = 0;
+  // STRICT CHECK (prevents misclassification bug)
+  for(let w of incomeWords){
+    if(t.includes(w)) return "income";
+  }
 
-  incomeRules.forEach(w => { if(t.includes(w)) incomeScore++; });
-  expenseRules.forEach(w => { if(t.includes(w)) expenseScore++; });
+  for(let w of expenseWords){
+    if(t.includes(w)) return "expense";
+  }
 
-  // direction override (MOST IMPORTANT)
-  if(/ne .* diya/.test(t)) incomeScore += 2;
-  if(/kharcha|lag gaye/.test(t)) expenseScore += 2;
-
-  return incomeScore > expenseScore ? "income" : "expense";
+  // fallback
+  return "expense";
 }
 
-// ---------- ADD ----------
-function add(text){
-  text = clean(text);
-  let amt = amount(text);
-  if(!amt) return;
+/* =========================
+   CATEGORY SYSTEM
+========================= */
+function getCategory(t){
 
-  let obj = {
-    text,
+  if(t.includes("petrol") || t.includes("fuel")) return "Fuel ⛽";
+  if(t.includes("chai") || t.includes("food") || t.includes("khana")) return "Food 🍵";
+  if(t.includes("uber") || t.includes("careem") || t.includes("bus")) return "Transport 🚗";
+  if(t.includes("salary") || t.includes("income")) return "Income 💰";
+  if(t.includes("bill")) return "Bills 📱";
+
+  return "Other 📦";
+}
+
+/* =========================
+   ADD ENTRY
+========================= */
+function add(){
+
+  let raw = document.getElementById("input").value;
+  let t = cleanText(raw);
+
+  let amt = getAmount(t);
+  if(!amt){
+    alert("Amount missing");
+    return;
+  }
+
+  data.push({
+    text: raw,
     amount: amt,
-    type: type(text),
-    cat: category(text),
-    time: new Date().toLocaleString()
-  };
+    type: getType(t),
+    category: getCategory(t)
+  });
 
-  data.push(obj);
-  localStorage.setItem("paisa", JSON.stringify(data));
+  localStorage.setItem("data", JSON.stringify(data));
+
+  document.getElementById("input").value = "";
+
   render();
 }
 
-// ---------- RENDER ----------
-function render(){
-  let list=document.getElementById("list");
-  list.innerHTML="";
-
-  let inc=0, exp=0;
-
-  data.forEach(d=>{
-    if(d.type==="income") inc+=d.amount;
-    else exp+=d.amount;
-
-    let div=document.createElement("div");
-    div.className="entry";
-    div.innerHTML=`
-      <div>
-        ${d.text}
-        <div class="tag">${d.cat}</div>
-      </div>
-      <div class="${d.type}">
-        ${d.type==="income"?"+":"-"}${d.amount}
-      </div>
-    `;
-    list.appendChild(div);
-  });
-
-  document.getElementById("inc").innerText=inc;
-  document.getElementById("exp").innerText=exp;
-  document.getElementById("net").innerText=inc-exp;
-}
-
-// ---------- INPUT ----------
-function addText(){
-  let t=document.getElementById("text").value;
-  if(t) add(t);
-  document.getElementById("text").value="";
-}
-
-// ---------- VOICE ----------
+/* =========================
+   🔥 VOICE (UPGRADED)
+========================= */
 let rec;
+let listening = false;
 
 function toggleVoice(){
-  let status=document.getElementById("status");
 
-  if(!rec){
-    rec = new (window.SpeechRecognition||window.webkitSpeechRecognition)();
-    rec.lang="ur-PK";
-    rec.interimResults=false;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    rec.onresult=(e)=>{
-      add(e.results[0][0].transcript);
-    };
-
-    rec.onerror=()=>{
-      status.innerText="Voice failed";
-    };
-
-    rec.onstart=()=>{
-      status.innerText="Listening...";
-    };
-
-    rec.onend=()=>{
-      status.innerText="Ready";
-    };
+  if(!SR){
+    alert("Voice not supported in this browser");
+    return;
   }
+
+  if(listening){
+    rec.stop();
+    return;
+  }
+
+  rec = new SR();
+
+  // 🔥 BEST OPTION FOR PAKISTAN (IMPORTANT FIX)
+  rec.lang = "en-IN";
+  rec.interimResults = true;
+  rec.continuous = false;
+
+  rec.onstart = ()=> listening = true;
+
+  rec.onerror = (e)=>{
+    console.log("voice error:", e.error);
+    listening = false;
+  };
+
+  rec.onresult = (e)=>{
+
+    let raw = e.results[0][0].transcript;
+
+    document.getElementById("input").value = raw;
+
+    if(e.results[0].isFinal){
+
+      setTimeout(()=>{
+        let cleaned = cleanText(raw);
+        document.getElementById("input").value = cleaned;
+        add();
+      }, 120);
+    }
+  };
+
+  rec.onend = ()=> listening = false;
 
   rec.start();
 }
 
+/* =========================
+   CALCULATOR
+========================= */
+function calc(){
+
+  let income = 0;
+  let expense = 0;
+
+  data.forEach(d=>{
+    if(d.type === "income") income += d.amount;
+    else expense += d.amount;
+  });
+
+  document.getElementById("income").innerText = income;
+  document.getElementById("expense").innerText = expense;
+  document.getElementById("net").innerText = income - expense;
+}
+
+/* =========================
+   RENDER
+========================= */
+function render(){
+
+  let list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.slice().reverse().forEach(d=>{
+
+    let el = document.createElement("div");
+    el.className = "card";
+
+    el.innerHTML = `
+      <b>${d.text}</b><br>
+      ${d.category} • ${d.type}<br>
+      Rs ${d.amount}
+    `;
+
+    list.appendChild(el);
+  });
+
+  calc();
+}
+
 render();
+
 </script>
 
 </body>
