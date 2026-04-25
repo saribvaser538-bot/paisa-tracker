@@ -3,19 +3,21 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Paisa Tracker Pro</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<title>Paisa Tracker</title>
 
 <style>
 body{
   margin:0;
-  font-family:Inter,sans-serif;
+  font-family:system-ui, sans-serif;
   background:#0b1220;
   color:#e5e7eb;
 }
 
-.container{max-width:520px;margin:auto;padding:16px}
+.container{
+  max-width:520px;
+  margin:auto;
+  padding:16px;
+}
 
 .card{
   background:#111a2e;
@@ -26,7 +28,6 @@ body{
 }
 
 h1{margin:0;font-size:18px}
-.small{font-size:12px;opacity:.7}
 
 .row{display:flex;gap:8px}
 
@@ -61,6 +62,7 @@ button{
   font-size:14px;
 }
 
+.small{font-size:12px;opacity:.7}
 .tag{font-size:11px;opacity:.6}
 
 .income{color:#22c55e}
@@ -73,8 +75,6 @@ button{
   padding:10px;
   border-top:1px solid #1f2a44;
 }
-
-.active{transform:scale(1.1)}
 </style>
 </head>
 
@@ -84,14 +84,14 @@ button{
 
   <div class="card">
     <h1>Paisa Tracker</h1>
-    <div class="small">Voice + manual tracking (fixed logic version)</div>
+    <div class="small">Voice + manual tracker (stable logic build)</div>
   </div>
 
   <div class="card">
     <div class="row">
-      <input id="text" placeholder="petrol 500, saad 1000, chai 200"/>
+      <input id="text" placeholder="petrol 500, saad ne 1000 diya, chai 200"/>
       <button onclick="addText()">Add</button>
-      <button class="voice" id="mic" onclick="toggleVoice()">🎤</button>
+      <button class="voice" onclick="toggleVoice()">🎤</button>
     </div>
     <div class="small" id="status">Ready</div>
   </div>
@@ -105,58 +105,64 @@ button{
 
   <div class="card" id="list"></div>
 
-  <div class="ad">Ad space — PRO removes this</div>
+  <div class="ad">Ad space (PRO removes this)</div>
 
 </div>
 
 <script>
 let data = JSON.parse(localStorage.getItem("paisa") || "[]");
 
-// ---------------- CLEAN ----------------
+// ---------- CLEAN ----------
 function clean(t){
-  return t.toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu,' ')
-    .replace(/\s+/g,' ')
-    .trim();
+  return t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
 }
 
-// ---------------- AMOUNT ----------------
+// ---------- AMOUNT ----------
 function amount(t){
   let m = t.match(/\d+/);
-  if(!m) return 0;
-  let v = parseInt(m[0]);
-  if(/k/.test(t)) v *= 1000;
-  return v;
+  return m ? parseInt(m[0]) : 0;
 }
 
-// ---------------- CATEGORY (FIXED) ----------------
+// ---------- CATEGORY ----------
 function category(t){
-  if(/petrol|fuel|diesel|cng|pump/.test(t)) return "fuel";
+  if(/petrol|fuel|diesel|cng/.test(t)) return "fuel";
   if(/chai|khana|food|biryani|hotel/.test(t)) return "food";
-  if(/uber|careem|rickshaw|bus|taxi/.test(t)) return "transport";
-  if(/bill|bijli|internet|mobile/.test(t)) return "bills";
-  if(/doctor|medicine|hospital/.test(t)) return "medical";
+  if(/uber|careem|bus|rickshaw/.test(t)) return "transport";
+  if(/bill|bijli|mobile|internet/.test(t)) return "bills";
+  if(/doctor|medicine/.test(t)) return "medical";
   return "other";
 }
 
-// ---------------- INTENT (FIXED + SCORED) ----------------
+// ---------- INTENT ENGINE (FIXED PROPERLY) ----------
 function type(t){
   t = clean(t);
+
+  // MONEY COMING IN
+  const incomeRules = [
+    "mila","mil gaya","received","aaya","diya","bheja",
+    "salary","income","kamai","bonus","refund"
+  ];
+
+  // MONEY GOING OUT
+  const expenseRules = [
+    "kharcha","lag gaye","spent","paid","kata","cut",
+    "petrol","chai","food","uber","careem","bill"
+  ];
 
   let incomeScore = 0;
   let expenseScore = 0;
 
-  const incomeWords = ["salary","income","kamai","mila","received","payment","bonus","freelance","rent","refund"];
-  const expenseWords = ["kharcha","spent","paid","diya","petrol","chai","food","uber","careem","bill","shopping"];
+  incomeRules.forEach(w => { if(t.includes(w)) incomeScore++; });
+  expenseRules.forEach(w => { if(t.includes(w)) expenseScore++; });
 
-  incomeWords.forEach(w => { if(t.includes(w)) incomeScore++; });
-  expenseWords.forEach(w => { if(t.includes(w)) expenseScore++; });
+  // direction override (MOST IMPORTANT)
+  if(/ne .* diya/.test(t)) incomeScore += 2;
+  if(/kharcha|lag gaye/.test(t)) expenseScore += 2;
 
-  if(incomeScore > expenseScore) return "income";
-  return "expense"; // default SAFE fallback
+  return incomeScore > expenseScore ? "income" : "expense";
 }
 
-// ---------------- ADD ----------------
+// ---------- ADD ----------
 function add(text){
   text = clean(text);
   let amt = amount(text);
@@ -175,10 +181,10 @@ function add(text){
   render();
 }
 
-// ---------------- UI ----------------
+// ---------- RENDER ----------
 function render(){
-  let list = document.getElementById("list");
-  list.innerHTML = "";
+  let list=document.getElementById("list");
+  list.innerHTML="";
 
   let inc=0, exp=0;
 
@@ -186,9 +192,9 @@ function render(){
     if(d.type==="income") inc+=d.amount;
     else exp+=d.amount;
 
-    let el=document.createElement("div");
-    el.className="entry";
-    el.innerHTML=`
+    let div=document.createElement("div");
+    div.className="entry";
+    div.innerHTML=`
       <div>
         ${d.text}
         <div class="tag">${d.cat}</div>
@@ -197,7 +203,7 @@ function render(){
         ${d.type==="income"?"+":"-"}${d.amount}
       </div>
     `;
-    list.appendChild(el);
+    list.appendChild(div);
   });
 
   document.getElementById("inc").innerText=inc;
@@ -205,43 +211,41 @@ function render(){
   document.getElementById("net").innerText=inc-exp;
 }
 
-// ---------------- INPUT ----------------
+// ---------- INPUT ----------
 function addText(){
   let t=document.getElementById("text").value;
   if(t) add(t);
   document.getElementById("text").value="";
 }
 
-// ---------------- VOICE (IMPROVED HANDLING) ----------------
+// ---------- VOICE ----------
 let rec;
 
 function toggleVoice(){
-  let mic=document.getElementById("mic");
   let status=document.getElementById("status");
 
   if(!rec){
     rec = new (window.SpeechRecognition||window.webkitSpeechRecognition)();
-    rec.lang = "ur-PK";
-    rec.interimResults = false;
+    rec.lang="ur-PK";
+    rec.interimResults=false;
 
     rec.onresult=(e)=>{
-      let t=e.results[0][0].transcript;
-      status.innerText="Heard: "+t;
-      add(t);
+      add(e.results[0][0].transcript);
     };
 
     rec.onerror=()=>{
-      status.innerText="Voice failed, type instead";
+      status.innerText="Voice failed";
+    };
+
+    rec.onstart=()=>{
+      status.innerText="Listening...";
     };
 
     rec.onend=()=>{
-      mic.classList.remove("active");
       status.innerText="Ready";
     };
   }
 
-  mic.classList.add("active");
-  status.innerText="Listening...";
   rec.start();
 }
 
