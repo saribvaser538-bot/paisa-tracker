@@ -1,782 +1,212 @@
 <!doctype html>
-<html lang="ur" class="h-full">
- <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Paisa Tracker</title>
-  <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#10b981">
-  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-  <script src="/_sdk/element_sdk.js"></script>
-  <script src="/_sdk/data_sdk.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&amp;family=IBM+Plex+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
-  <style>
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body { font-family: 'IBM Plex Sans', sans-serif; }
+<html lang="ur">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Paisa Tracker Voice</title>
 
-  @keyframes pulse-ring {
-    0% { transform: scale(1); opacity: 0.6; }
-    100% { transform: scale(1.8); opacity: 0; }
-  }
-  @keyframes mic-glow {
-    0%, 100% { box-shadow: 0 0 20px rgba(239,68,68,0.3); }
-    50% { box-shadow: 0 0 40px rgba(239,68,68,0.7); }
-  }
-  .listening .mic-ring { animation: pulse-ring 1.2s ease-out infinite; }
-  .listening .mic-btn { animation: mic-glow 1s ease-in-out infinite; }
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans&display=swap" rel="stylesheet">
 
-  @keyframes slideUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-  .slide-up { animation: slideUp 0.3s ease-out; }
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  .toast-enter { animation: slideUp 0.3s ease-out; }
-  .entry-card { animation: slideUp 0.25s ease-out; }
-
-  .tab-active { border-bottom: 3px solid #10b981; color: #10b981; }
-
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+<style>
+body { font-family: 'IBM Plex Sans', sans-serif; background:#0f172a; color:#e2e8f0; }
+.listening { animation: pulse 1s infinite; }
+@keyframes pulse { 0%{opacity:1} 50%{opacity:.5} 100%{opacity:1} }
 </style>
-  <style>body { box-sizing: border-box; }</style>
- </head>
- <body class="h-full">
-  <div id="app" class="h-full w-full flex flex-col overflow-auto" style="background: #0f172a; color: #e2e8f0;">
-   <!-- Header -->
-   <header class="flex items-center justify-between px-4 py-3 flex-shrink-0" style="background: #1e293b;">
-    <div class="flex items-center gap-2">
-     <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: #10b981;">
-      <span class="text-white font-bold text-sm">₨</span>
-     </div>
-     <h1 id="header-title" class="font-bold text-lg" style="color: #f1f5f9;">Paisa Tracker</h1>
-    </div><button id="pro-badge" onclick="showProModal()" class="text-xs px-3 py-1 rounded-full font-semibold" style="background: #f59e0b; color: #0f172a;">PRO ★</button>
-   </header><!-- Summary Cards -->
-   <div id="summary-section" class="px-4 pt-4 pb-2 flex-shrink-0">
-    <div class="grid grid-cols-3 gap-2 mb-3">
-     <div class="rounded-xl p-3 text-center" style="background: #1e293b;">
-      <p class="text-xs opacity-60 mb-1">Amdani</p>
-      <p id="total-income" class="font-bold text-base" style="color: #10b981;">Rs 0</p>
-     </div>
-     <div class="rounded-xl p-3 text-center" style="background: #1e293b;">
-      <p class="text-xs opacity-60 mb-1">Kharcha</p>
-      <p id="total-expense" class="font-bold text-base" style="color: #ef4444;">Rs 0</p>
-     </div>
-     <div class="rounded-xl p-3 text-center" style="background: #1e293b;">
-      <p class="text-xs opacity-60 mb-1">Net</p>
-      <p id="net-total" class="font-bold text-base" style="color: #f1f5f9;">Rs 0</p>
-     </div>
-    </div><!-- Insight -->
-    <div id="insight-bar" class="rounded-lg px-3 py-2 text-sm text-center mb-2 hidden" style="background: #1e293b;">
-     <span id="insight-text"></span>
-    </div>
-   </div><!-- Tabs -->
-   <div class="flex border-b flex-shrink-0" style="border-color: #334155;">
-    <button onclick="switchTab('today')" id="tab-today" class="flex-1 py-2 text-sm font-medium tab-active">Aaj</button> <button onclick="switchTab('yesterday')" id="tab-yesterday" class="flex-1 py-2 text-sm font-medium opacity-60">Kal</button> <button onclick="switchTab('all')" id="tab-all" class="flex-1 py-2 text-sm font-medium opacity-60">Sab</button>
-   </div><!-- Entry List -->
-   <div id="entry-list" class="flex-1 overflow-auto px-4 py-3 space-y-2">
-    <div id="empty-state" class="flex flex-col items-center justify-center py-12 opacity-40">
-     <i data-lucide="mic" style="width:48px;height:48px;"></i>
-     <p class="mt-3 text-sm">Mic dabao aur bolo</p>
-     <p class="text-xs mt-1">"petrol 500" ya "uber 2000"</p>
-    </div>
-   </div><!-- Voice Button Area -->
-   <div class="flex-shrink-0 pb-4 pt-2 px-4" style="background: linear-gradient(transparent, #0f172a 30%);">
-    <!-- Manual Input -->
-    <div id="manual-row" class="flex gap-2 mb-3">
-     <input id="manual-input" type="text" placeholder="Likho: &quot;chai 200&quot; ya &quot;uber 1500&quot;" class="flex-1 rounded-xl px-4 py-3 text-sm outline-none" style="background:#1e293b; color:#f1f5f9; border:1px solid #334155;"> <button onclick="processManualInput()" class="rounded-xl px-4 font-semibold text-sm" style="background:#10b981; color:#0f172a;"> <i data-lucide="send" style="width:18px;height:18px;"></i> </button>
-    </div><!-- Mic Button -->
-    <div id="mic-container" class="flex flex-col items-center">
-     <div id="recognized-preview" class="text-sm mb-2 text-center opacity-70 hidden"></div>
-     <div class="relative">
-      <div class="mic-ring absolute inset-0 rounded-full" style="background: #ef4444; opacity:0;"></div><button id="mic-btn" onclick="toggleVoice()" class="mic-btn relative w-16 h-16 rounded-full flex items-center justify-center transition-all" style="background: #ef4444;"> <i data-lucide="mic" style="width:28px;height:28px;color:white;"></i> </button>
-     </div>
-     <p id="mic-status" class="text-xs mt-2 opacity-50">Mic dabao</p>
-    </div>
-   </div><!-- Banner Ad Placeholder -->
-   <div id="ad-banner" class="flex-shrink-0 text-center py-2 text-xs opacity-30" style="background:#1e293b;">
-    📢 Ad Space — PRO mein remove hoga
-   </div><!-- Toast -->
-   <div id="toast" class="fixed top-4 left-4 right-4 rounded-xl px-4 py-3 text-sm font-medium z-50 hidden" style="background:#10b981; color:#0f172a;"></div><!-- Pro Modal -->
-   <div id="pro-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-6" style="background:rgba(0,0,0,0.7);">
-    <div class="rounded-2xl p-6 w-full max-w-sm slide-up" style="background:#1e293b;">
-     <div class="flex justify-between items-center mb-4">
-      <h2 class="font-bold text-lg" style="color:#f59e0b;">★ PRO Version</h2><button onclick="closeProModal()" class="opacity-60"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
-     </div>
-     <p class="text-2xl font-extrabold mb-1" style="color:#f59e0b;">Rs 79<span class="text-sm font-normal opacity-60">/month</span></p>
-     <ul class="space-y-2 my-4 text-sm">
-      <li class="flex gap-2 items-center"><i data-lucide="check" style="width:16px;height:16px;color:#10b981;"></i> Ads hatao</li>
-      <li class="flex gap-2 items-center"><i data-lucide="check" style="width:16px;height:16px;color:#10b981;"></i> Weekly insights</li>
-      <li class="flex gap-2 items-center"><i data-lucide="check" style="width:16px;height:16px;color:#10b981;"></i> Smart alerts</li>
-      <li class="flex gap-2 items-center"><i data-lucide="check" style="width:16px;height:16px;color:#10b981;"></i> Backup &amp; restore</li>
-     </ul><button onclick="activatePro()" class="w-full py-3 rounded-xl font-bold text-base" style="background:#f59e0b; color:#0f172a;">PRO Activate Karo</button>
-     <p class="text-xs text-center mt-2 opacity-40">Demo mode — subscription simulation</p>
-    </div>
-   </div><!-- Delete Confirm -->
-   <div id="delete-confirm" class="fixed inset-0 z-50 hidden flex items-end justify-center p-4" style="background:rgba(0,0,0,0.6);">
-    <div class="rounded-2xl p-5 w-full max-w-sm slide-up" style="background:#1e293b;">
-     <p class="font-semibold mb-1">Entry delete karo?</p>
-     <p id="delete-text" class="text-sm opacity-60 mb-4"></p>
-     <div class="flex gap-3">
-      <button onclick="cancelDelete()" class="flex-1 py-2.5 rounded-xl font-medium" style="background:#334155;">Nahi</button> <button onclick="confirmDelete()" class="flex-1 py-2.5 rounded-xl font-bold" style="background:#ef4444; color:white;">Haan, Delete</button>
-     </div>
-    </div>
-   </div>
-  </div>
-  <script>
-// ===== CONFIG =====
-const defaultConfig = {
-  app_title: 'Paisa Tracker',
-  currency_symbol: 'Rs',
-  background_color: '#0f172a',
-  surface_color: '#1e293b',
-  text_color: '#e2e8f0',
-  primary_action: '#10b981',
-  secondary_action: '#ef4444',
-  font_family: 'IBM Plex Sans',
-  font_size: 16,
-  is_pro: false
-};
+</head>
 
-let allData = [];
-let currentTab = 'today';
-let pendingDeleteRecord = null;
+<body class="p-4">
 
-// ===== ELEMENT SDK =====
-window.elementSdk.init({
-  defaultConfig,
-  onConfigChange: async (config) => {
-    const c = { ...defaultConfig, ...config };
-    const app = document.getElementById('app');
-    app.style.background = c.background_color;
-    app.style.color = c.text_color;
-    app.style.fontFamily = `${c.font_family}, sans-serif`;
-    document.getElementById('header-title').textContent = c.app_title;
-    document.querySelectorAll('[style*="background: #1e293b"], [style*="background:#1e293b"]').forEach(el => {
-      el.style.background = c.surface_color;
-    });
-    document.getElementById('mic-btn').style.background = c.secondary_action;
-    document.querySelectorAll('[style*="color: #10b981"], [style*="color:#10b981"]').forEach(el => {
-      el.style.color = c.primary_action;
-    });
-    // Update ad banner visibility
-    document.getElementById('ad-banner').style.display = c.is_pro ? 'none' : 'block';
-    renderEntries();
-  },
-  mapToCapabilities: (config) => {
-    const c = { ...defaultConfig, ...config };
-    const makeColor = (key) => ({
-      get: () => c[key] || defaultConfig[key],
-      set: (v) => { c[key] = v; window.elementSdk.setConfig({ [key]: v }); }
-    });
-    return {
-      recolorables: [
-        makeColor('background_color'),
-        makeColor('surface_color'),
-        makeColor('text_color'),
-        makeColor('primary_action'),
-        makeColor('secondary_action')
-      ],
-      borderables: [],
-      fontEditable: {
-        get: () => c.font_family || defaultConfig.font_family,
-        set: (v) => { c.font_family = v; window.elementSdk.setConfig({ font_family: v }); }
-      },
-      fontSizeable: {
-        get: () => c.font_size || defaultConfig.font_size,
-        set: (v) => { c.font_size = v; window.elementSdk.setConfig({ font_size: v }); }
-      }
-    };
-  },
-  mapToEditPanelValues: (config) => new Map([
-    ['app_title', config.app_title || defaultConfig.app_title],
-    ['currency_symbol', config.currency_symbol || defaultConfig.currency_symbol]
-  ])
-});
+<div class="max-w-md mx-auto">
 
-// ===== DATA SDK =====
-const dataHandler = {
-  onDataChanged(data) {
-    allData = data;
-    renderEntries();
-    updateSummary();
-  }
-};
-(async () => {
-  const r = await window.dataSdk.init(dataHandler);
-  if (!r.isOk) console.error('Data SDK init failed');
-})();
+<h1 class="text-xl font-bold mb-4">Paisa Tracker (Voice)</h1>
 
-// ===== 5-STAGE PARSER PIPELINE =====
-// RAW TEXT → NORMALIZED → DATE → AMOUNT → INTENT → CATEGORY → OBJECT
+<!-- INPUT -->
+<input id="textInput"
+class="w-full p-3 rounded bg-slate-800 mb-3"
+placeholder="bolain: petrol 500 ya chai 200"
+/>
 
-// HELPER: ABSOLUTE DATE EXTRACTOR
-// Input: normalized text | Output: Date object or null
-// Matches patterns like "15 jan", "3 march", etc.
-function extractAbsoluteDate(text) {
-  const months = {
-    january: 0, february: 1, march: 2, april: 3,
-    may: 4, june: 5, july: 6, august: 7,
-    september: 8, october: 9, november: 10, december: 11,
-    jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
-  };
+<!-- MIC -->
+<button id="micBtn"
+class="w-full p-4 rounded bg-red-500 font-bold">
+🎤 Tap to Speak
+</button>
 
-  const t = text.toLowerCase();
-  const match = t.match(/(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/);
+<p id="status" class="mt-2 text-sm opacity-70"></p>
 
-  if (!match) return null;
+<!-- OUTPUT -->
+<div id="log" class="mt-6 space-y-2"></div>
 
-  const day = parseInt(match[1], 10);
-  if (day < 1 || day > 31) return null;  // Sanity check
+</div>
 
-  const monthStr = match[2];
-  const month = months[monthStr];
-
-  if (month === undefined) return null;
-
-  const date = new Date();
-  date.setMonth(month);
-  date.setDate(day);
-
-  return date;
-}
-
-// HELPER: RELATIVE DATE EXTRACTOR
-// Input: normalized text | Output: day offset (negative = past, 0 = today, null = no match)
-// Matches: "kal" (-1), "parso" (-2), "aaj" (0), "3 din pehle" (-3), etc.
-function extractRelativeDate(text) {
-  const t = text.toLowerCase();
-
-  if (t.includes('kal')) return -1;
-  if (t.includes('parso')) return -2;
-  if (t.includes('aaj')) return 0;
-
-  const match = t.match(/(\d+)\s*din\s*pehle/);
-  if (match) return -parseInt(match[1], 10);
-
-  return null;
-}
-
-// STAGE 1: NORMALIZER
-// Input: raw user text | Output: cleaned lowercase string
-function normalizeText(rawText) {
-  if (!rawText || typeof rawText !== 'string') return '';
-  
-  return rawText
+<script>
+// =====================
+// SAFE NORMALIZER
+// =====================
+function normalize(text){
+  return text
     .toLowerCase()
-    .replace(/[,।]/g, ' ')      // Remove punctuation
-    .replace(/\s+/g, ' ')        // Collapse spaces
+    .replace(/[,\.\-\_]/g,' ')
+    .replace(/\s+/g,' ')
     .trim();
 }
 
-// HELPER: RESOLVE DATE TO DATE OBJECT
-// Input: normalized text | Output: Date object
-// Priority: absolute dates > relative dates > default today
-function resolveDate(text) {
-  // PRIORITY 1: Absolute date (e.g., "15 jan", "3 march")
-  const absolute = extractAbsoluteDate(text);
-  if (absolute) return absolute;
+// =====================
+// URDU + ROMAN CLEANER
+// =====================
+function cleanVoice(text){
+  if(!text) return '';
 
-  // PRIORITY 2: Relative date (e.g., "kal", "parso", "3 din pehle")
-  const relative = extractRelativeDate(text);
-  if (relative !== null) {
-    const d = new Date();
-    d.setDate(d.getDate() + relative);
-    return d;
-  }
-
-  // DEFAULT: today
-  return new Date();
+  return normalize(text)
+    .replace(/ٹرانسپورٹ|transport/g,'uber')
+    .replace(/پٹرول|petrol/g,'petrol')
+    .replace(/چائے|chai/g,'chai')
+    .replace(/روپے|rs|pkr/g,'')
+    .trim();
 }
 
-// STAGE 2: TIME PARSER
-// Input: normalized text | Output: date string (YYYY-MM-DD)
-// Extracts ONLY temporal information; does NOT modify text
-// Uses resolveDate() for priority logic
-function parseTime(normalizedText) {
-  // Priority 1-2: Absolute or relative dates via resolveDate()
-  const resolvedDate = resolveDate(normalizedText);
-  if (resolvedDate) return formatDate(resolvedDate);
+// =====================
+// AMOUNT PARSER
+// =====================
+function extractAmount(text){
+  const match = text.match(/(\d+(\.\d+)?)/);
+  if(!match) return 0;
+  let amt = parseFloat(match[1]);
 
-  // Priority 3: Relative day patterns (e.g., "3 din", "5din")
-  // Matches: "3 din", "3din", "5 days", "5days"
-  const daysMatch = normalizedText.match(/(\d+)\s*(?:din|days?)\b/i);
-  if (daysMatch) {
-    const days = parseInt(daysMatch[1], 10);
-    if (days > 0 && days <= 365) {  // Sanity check: 1-365 days
-      const d = new Date();
-      d.setDate(d.getDate() - days);
-      return formatDate(d);
-    }
-  }
+  if(text.includes('k')) amt *= 1000;
 
-  // Priority 4: English keywords (fallback for bilingual input)
-  if (normalizedText.includes('today')) return todayStr();
-  if (normalizedText.includes('yesterday')) return yesterdayStr();
-
-  // Fallback: assume today
-  return todayStr();
+  return amt;
 }
 
-// STAGE 2b: CLEANUP HELPER
-// Strip time tokens from text before amount/intent parsing
-// Prevents date keywords from interfering with other stages
-function stripTimeTokens(normalizedText) {
-  let cleaned = normalizedText;
-  
-  // Remove explicit date keywords
-  cleaned = cleaned.replace(/\b(aaj|kal|parso)\b/g, '');
-  
-  // Remove relative day patterns
-  cleaned = cleaned.replace(/\b\d+\s*din\b/g, '');
-  
-  // Collapse whitespace
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  
-  return cleaned;
+// =====================
+// TYPE DETECTION
+// =====================
+function detectType(text){
+  const income = ['mila','kamaya','received','income'];
+  const expense = ['kharcha','paid','spent','petrol','chai','uber','food'];
+
+  if(income.some(k => text.includes(k))) return 'income';
+  if(expense.some(k => text.includes(k))) return 'expense';
+
+  return 'expense'; // default safer
 }
 
-// STAGE 3: AMOUNT PARSER
-// Input: cleaned text (no date tokens) | Output: numeric amount
-// Extracts first number found, applies 'k' multiplier if suffix present
-// Priority: looks for number first, then checks for 'k' anywhere in text after it
-function parseAmount(cleanedText) {
-  // Pattern: captures first decimal or integer number found
-  const match = cleanedText.match(/(\d+(?:\.\d+)?)/);
-  if (!match) return 0;
-
-  let amount = parseFloat(match[1]);
-  if (isNaN(amount) || amount <= 0) return 0;
-
-  // Check if 'k' suffix appears anywhere near the number (word-boundary safe)
-  // Matches: "500k", "500 k", "5k", but not "bike500k"
-  const kMatch = cleanedText.match(/(\d+(?:\.\d+)?)\s*k\b/i);
-  if (kMatch && kMatch[0] === match[0] + (cleanedText.slice(match.index + match[0].length).match(/^\s*k\b/i) ? '' : '')) {
-    amount *= 1000;
-  }
-
-  return amount;
-}
-
-// STAGE 4: INTENT PARSER
-// Input: cleaned text (no date tokens) | Output: 'income' or 'expense'
-// Priority: income markers > expense markers > context > default expense
-function parseIntent(cleanedText) {
-  // Define keyword sets
-  const incomeKeywords = [
-    'amdani', 'kamaya', 'kamaye', 'kamai', 'mila', 'mile', 'paya', 'paisa',
-    'paise', 'rakam', 'deposit', 'received', 'payment', 'tankhwa', 'salary',
-    'bheja', 'client', 'freelance', 'deliver', 'booking', 'income', 'earned',
-    'commission', 'bonus', 'advance', 'fee', 'charge', 'pickup', 'drop',
-    'order', 'trip', 'sawari', 'bol', 'order', 'getfair'
-  ];
-
-  const expenseKeywords = [
-    'kharcha', 'kharch', 'kharch', 'spent', 'paid', 'diya', 'diye',
-    'de diya', 'de dia', 'liya', 'liye', 'checked', 'bill', 'khana',
-    'petrol', 'fuel', 'chai', 'uber', 'careem'
-  ];
-
-  // Priority 1: Income keywords override all else
-  if (incomeKeywords.some(k => cleanedText.includes(k))) {
-    return 'income';
-  }
-
-  // Priority 2: Expense keywords are reliable indicators
-  if (expenseKeywords.some(k => cleanedText.includes(k))) {
-    return 'expense';
-  }
-
-  // Priority 3: Context rule for ambiguous transport
-  // If text has transport keywords but NO expense markers → assume rider earning
-  if ((cleanedText.includes('uber') || cleanedText.includes('careem') || 
-       cleanedText.includes('ride') || cleanedText.includes('sawari')) &&
-      !expenseKeywords.some(k => cleanedText.includes(k))) {
-    return 'income';  // rider earning, not paying for ride
-  }
-
-  // Fallback: safer to assume expense
-  return 'expense';
-}
-
-// LEGACY COMPATIBILITY: parseType (same logic, alternate name)
-function parseType(text) {
-  const normalized = normalizeText(text);
-  const cleaned = stripTimeTokens(normalized);
-  return parseIntent(cleaned);
-}
-
-// STAGE 5: CATEGORY MAPPER
-// Input: cleaned text (no date tokens) | Output: category string
-// Matches keywords to predefined categories; defaults to 'other'
-// Priority: fuel > food > transport > bills > medical > family > other
-function mapCategory(cleanedText, type) {
-  const rules = {
-    fuel: ['petrol', 'diesel', 'fuel', 'cng', 'gas', 'pump', 'patrol'],
-    food: ['chai', 'khana', 'nashta', 'lunch', 'dinner', 'hotel', 'restaurant', 'biryani'],
-    transport: ['uber', 'careem', 'ride', 'sawari', 'kiraya', 'bus', 'rickshaw', 'metro'],
-    bills: ['bijli', 'bill', 'mobile', 'phone', 'recharge', 'internet', 'rent'],
-    medical: ['dawai', 'medicine', 'doctor', 'hospital', 'clinic', 'lab', 'injection'],
-    family: ['ghar', 'school', 'fee', 'ration', 'groceries', 'clothes', 'shopping'],
-  };
-
-  // Check each category's keywords in priority order
-  for (const [category, keywords] of Object.entries(rules)) {
-    if (keywords.some(kw => cleanedText.includes(kw))) {
-      return category;
-    }
-  }
-
-  // Default fallback
+// =====================
+// CATEGORY
+// =====================
+function category(text){
+  if(text.includes('petrol')) return 'fuel';
+  if(text.includes('chai')) return 'food';
+  if(text.includes('uber')) return 'transport';
   return 'other';
 }
 
-// LEGACY COMPATIBILITY: parseCategory (same logic, alternate name)
-function parseCategory(text) {
-  const normalized = normalizeText(text);
-  const cleaned = stripTimeTokens(normalized);
-  return mapCategory(cleaned, 'expense');
-}
+// =====================
+// SPEECH ENGINE (ROBUST)
+// =====================
+let recognition;
+let listening = false;
 
-// ===== MAIN PARSER: 5-STAGE PIPELINE =====
-// Orchestrates all stages: normalize → date → strip → amount → intent → category
-function parseInput(rawText) {
-  // STAGE 1: Normalize text
-  const normalized = normalizeText(rawText);
-  if (!normalized) return null;
-
-  // STAGE 2: Extract time (does NOT modify text)
-  const dateStr = parseTime(normalized);
-
-  // Remove date tokens before parsing amount/intent
-  const cleanedForParsing = stripTimeTokens(normalized);
-
-  // STAGE 3: Parse amount from cleaned text
-  let amount = parseAmount(cleanedForParsing);
-  if (amount <= 0 || amount > 10000000) return null;
-
-  // STAGE 4: Detect intent (income vs expense)
-  const type = parseIntent(cleanedForParsing);
-
-  // STAGE 5: Map to category
-  const category = mapCategory(cleanedForParsing, type);
-
-  return {
-    amount,
-    type,
-    category,
-    date_str: dateStr,
-    original_text: rawText,
-    timestamp: new Date().toISOString()
-  };
-}
-
-// ===== LEGACY COMPATIBILITY =====
-function detectType(text) {
-  const cleaned = stripTimeTokens(normalizeText(text));
-  return parseIntent(cleaned);
-}
-
-// HIGH-LEVEL ORCHESTRATOR: parseExpense (alternative name for parseInput)
-// Provides familiar interface while leveraging the full 5-stage pipeline
-function parseExpense(rawText) {
-  const normalized = normalizeText(rawText);
-  if (!normalized) return null;
-
-  const time = parseTime(normalized);
-  const cleaned = stripTimeTokens(normalized);
-  const amount = parseAmount(cleaned);
-  const type = parseType(cleaned);  // Uses parseIntent internally
-  const category = parseCategory(cleaned);  // Uses mapCategory internally
-
-  return {
-    amount,
-    type,
-    category,
-    date: time,
-    original_text: rawText,
-    timestamp: new Date().toISOString()
-  };
-}
-
-
-
-function todayStr() { return formatDate(new Date()); }
-function yesterdayStr() { const d = new Date(); d.setDate(d.getDate()-1); return formatDate(d); }
-function formatDate(d) { return d.toISOString().split('T')[0]; }
-
-// ===== VOICE =====
-let recognition = null;
-let isListening = false;
-
-function toggleVoice() {
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    showToast('Voice not supported — type karo!', 'warn');
-    return;
-  }
-  if (isListening) { recognition?.stop(); return; }
+function startVoice(){
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SR){
+    alert("Speech not supported");
+    return;
+  }
+
   recognition = new SR();
+
+  // IMPORTANT FIX:
+  // start Urdu first, fallback to English INDIAN accent (works better in Pakistan)
   recognition.lang = 'ur-PK';
+
   recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
+  recognition.continuous = false;
 
-  const preview = document.getElementById('recognized-preview');
-  const container = document.getElementById('mic-container');
-  const status = document.getElementById('mic-status');
+  document.getElementById('status').innerText = "Listening...";
 
-  recognition.onstart = () => {
-    isListening = true;
-    container.classList.add('listening');
-    status.textContent = 'Sun raha hoon...';
-    preview.classList.remove('hidden');
-    preview.textContent = '...';
-  };
+  recognition.onresult = (e)=>{
+    let transcript = e.results[0][0].transcript;
 
-  recognition.onresult = (e) => {
-    const t = e.results[0][0].transcript;
-    preview.textContent = `"${t}"`;
-    if (e.results[0].isFinal) {
-      processText(t);
+    transcript = cleanVoice(transcript);
+
+    document.getElementById('textInput').value = transcript;
+
+    if(e.results[0].isFinal){
+      process(transcript);
     }
   };
 
-  recognition.onend = () => {
-    isListening = false;
-    container.classList.remove('listening');
-    status.textContent = 'Mic dabao';
-    setTimeout(() => { preview.classList.add('hidden'); }, 2000);
+  recognition.onerror = (e)=>{
+    console.log(e);
+    document.getElementById('status').innerText = "Error: try again";
+    listening = false;
   };
 
-  recognition.onerror = (e) => {
-    isListening = false;
-    container.classList.remove('listening');
-    if (e.error === 'not-allowed') {
-      showToast('Mic permission do — ya type karo', 'warn');
-    }
-    status.textContent = 'Mic dabao';
+  recognition.onend = ()=>{
+    listening = false;
+    document.getElementById('status').innerText = "Stopped";
   };
 
   recognition.start();
+  listening = true;
 }
 
-function processManualInput() {
-  const inp = document.getElementById('manual-input');
-  const text = inp.value.trim();
-  if (text) { processText(text); inp.value = ''; }
+// =====================
+// PROCESS ENTRY
+// =====================
+function process(text){
+
+  const amt = extractAmount(text);
+  if(!amt){
+    alert("Amount samajh nahi aaya");
+    return;
+  }
+
+  const type = detectType(text);
+  const cat = category(text);
+
+  const entry = {
+    text,
+    amount: amt,
+    type,
+    category: cat,
+    time: new Date().toLocaleString()
+  };
+
+  render(entry);
 }
-document.getElementById('manual-input')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); processManualInput(); }
+
+// =====================
+// UI RENDER
+// =====================
+function render(e){
+  const div = document.createElement('div');
+  div.className = "p-3 bg-slate-800 rounded";
+
+  div.innerHTML = `
+    <b>${e.type.toUpperCase()}</b> - ${e.category}<br/>
+    Rs ${e.amount}<br/>
+    <small>${e.text}</small>
+  `;
+
+  document.getElementById('log').prepend(div);
+}
+
+// =====================
+// EVENTS
+// =====================
+document.getElementById('micBtn').onclick = startVoice;
+
+document.getElementById('textInput').addEventListener('keydown',(e)=>{
+  if(e.key==='Enter'){
+    process(e.target.value);
+  }
 });
-
-async function processText(text) {
-  const parsed = parseInput(text);
-  if (!parsed) {
-    showToast('Samajh nahi aaya — dobara bolo', 'warn');
-    return;
-  }
-  if (allData.length >= 999) {
-    showToast('Limit ho gayi — purane entries delete karo', 'warn');
-    return;
-  }
-  const btn = document.getElementById('mic-btn');
-  btn.style.opacity = '0.5';
-  const result = await window.dataSdk.create(parsed);
-  btn.style.opacity = '1';
-  if (result.isOk) {
-    const cfg = window.elementSdk.config || defaultConfig;
-    const sym = cfg.currency_symbol || defaultConfig.currency_symbol;
-    const typeLabel = parsed.type === 'income' ? '💰' : '💸';
-    showToast(`${typeLabel} ${sym} ${parsed.amount.toLocaleString()} — ${parsed.category}`, parsed.type === 'income' ? 'ok' : 'expense');
-  } else {
-    showToast('Save nahi hua — dobara try karo', 'warn');
-  }
-}
-
-// ===== RENDERING =====
-function getFilteredData() {
-  const today = todayStr();
-  const yesterday = yesterdayStr();
-  if (currentTab === 'today') return allData.filter(d => d.date_str === today);
-  if (currentTab === 'yesterday') return allData.filter(d => d.date_str === yesterday);
-  return [...allData];
-}
-
-function renderEntries() {
-  const list = document.getElementById('entry-list');
-  const empty = document.getElementById('empty-state');
-  const filtered = getFilteredData();
-  const cfg = window.elementSdk?.config || defaultConfig;
-  const sym = cfg.currency_symbol || defaultConfig.currency_symbol;
-
-  if (filtered.length === 0) {
-    // Remove non-empty entries
-    list.querySelectorAll('.entry-item').forEach(el => el.remove());
-    empty.classList.remove('hidden');
-    return;
-  }
-  empty.classList.add('hidden');
-
-  // Sort by timestamp desc
-  filtered.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-
-  const existingMap = new Map();
-  list.querySelectorAll('.entry-item').forEach(el => existingMap.set(el.dataset.id, el));
-  const newIds = new Set(filtered.map(d => d.__backendId));
-
-  // Remove stale
-  existingMap.forEach((el, id) => { if (!newIds.has(id)) el.remove(); });
-
-  // Upsert
-  filtered.forEach((entry, i) => {
-    const id = entry.__backendId;
-    let el = existingMap.get(id);
-    const isIncome = entry.type === 'income';
-    const icon = isIncome ? '↗' : '↘';
-    const color = isIncome ? (cfg.primary_action || '#10b981') : (cfg.secondary_action || '#ef4444');
-    const catEmoji = { fuel:'⛽', food:'🍵', transport:'🚗', bills:'📱', medical:'💊', family:'👨‍👩‍👧', other:'📦' }[entry.category] || '📦';
-
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'entry-item entry-card flex items-center gap-3 rounded-xl p-3 cursor-pointer';
-      el.style.background = cfg.surface_color || '#1e293b';
-      el.dataset.id = id;
-      el.onclick = () => promptDelete(entry);
-      list.appendChild(el);
-    }
-
-    el.innerHTML = `
-      <div class="text-2xl">${catEmoji}</div>
-      <div class="flex-1 min-w-0">
-        <p class="font-medium text-sm truncate">${entry.original_text || entry.category}</p>
-        <p class="text-xs opacity-50">${entry.category} · ${entry.date_str}</p>
-      </div>
-      <div class="text-right">
-        <p class="font-bold" style="color:${color}">${icon} ${sym} ${Number(entry.amount).toLocaleString()}</p>
-      </div>
-    `;
-  });
-}
-
-function updateSummary() {
-  const cfg = window.elementSdk?.config || defaultConfig;
-  const sym = cfg.currency_symbol || defaultConfig.currency_symbol;
-  const filtered = getFilteredData();
-
-  let income = 0, expense = 0;
-  filtered.forEach(d => {
-    if (d.type === 'income') income += Number(d.amount);
-    else expense += Number(d.amount);
-  });
-  const net = income - expense;
-
-  document.getElementById('total-income').textContent = `${sym} ${income.toLocaleString()}`;
-  document.getElementById('total-expense').textContent = `${sym} ${expense.toLocaleString()}`;
-
-  const netEl = document.getElementById('net-total');
-  netEl.textContent = `${sym} ${Math.abs(net).toLocaleString()}`;
-  netEl.style.color = net >= 0 ? (cfg.primary_action || '#10b981') : (cfg.secondary_action || '#ef4444');
-  if (net < 0) netEl.textContent = `-${netEl.textContent}`;
-
-  // Insight
-  const bar = document.getElementById('insight-bar');
-  const insightText = document.getElementById('insight-text');
-  if (filtered.length > 0) {
-    bar.classList.remove('hidden');
-    if (net > 0) {
-      insightText.textContent = `✅ Profit mein ho — ${sym} ${net.toLocaleString()}`;
-      insightText.style.color = cfg.primary_action || '#10b981';
-    } else if (net < 0) {
-      // Find top expense category
-      const cats = {};
-      filtered.filter(d => d.type === 'expense').forEach(d => { cats[d.category] = (cats[d.category]||0) + Number(d.amount); });
-      const topCat = Object.entries(cats).sort((a,b) => b[1]-a[1])[0];
-      const reason = topCat ? ` — ${topCat[0]} ki wajah se` : '';
-      insightText.textContent = `⚠️ Loss mein ho${reason}`;
-      insightText.style.color = cfg.secondary_action || '#ef4444';
-    } else {
-      insightText.textContent = '➖ Barabar hai — na profit na loss';
-      insightText.style.color = cfg.text_color || '#e2e8f0';
-    }
-  } else {
-    bar.classList.add('hidden');
-  }
-}
-
-// ===== TABS =====
-function switchTab(tab) {
-  currentTab = tab;
-  ['today','yesterday','all'].forEach(t => {
-    const el = document.getElementById('tab-' + t);
-    if (t === tab) { el.classList.add('tab-active'); el.classList.remove('opacity-60'); }
-    else { el.classList.remove('tab-active'); el.classList.add('opacity-60'); }
-  });
-  renderEntries();
-  updateSummary();
-}
-
-// ===== DELETE =====
-function promptDelete(record) {
-  pendingDeleteRecord = record;
-  document.getElementById('delete-text').textContent = `"${record.original_text}" — ${record.type === 'income' ? 'Amdani' : 'Kharcha'} Rs ${Number(record.amount).toLocaleString()}`;
-  document.getElementById('delete-confirm').classList.remove('hidden');
-}
-function cancelDelete() {
-  pendingDeleteRecord = null;
-  document.getElementById('delete-confirm').classList.add('hidden');
-}
-async function confirmDelete() {
-  if (!pendingDeleteRecord) return;
-  document.getElementById('delete-confirm').classList.add('hidden');
-  const result = await window.dataSdk.delete(pendingDeleteRecord);
-  if (result.isOk) showToast('Delete ho gaya', 'ok');
-  else showToast('Delete nahi hua', 'warn');
-  pendingDeleteRecord = null;
-}
-
-// ===== PRO =====
-function showProModal() { document.getElementById('pro-modal').classList.remove('hidden'); }
-function closeProModal() { document.getElementById('pro-modal').classList.add('hidden'); }
-function activatePro() {
-  window.elementSdk.setConfig({ is_pro: true });
-  document.getElementById('ad-banner').style.display = 'none';
-  closeProModal();
-  showToast('★ PRO activate ho gaya!', 'ok');
-}
-
-// ===== TOAST =====
-function showToast(msg, type = 'ok') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.background = type === 'ok' ? '#10b981' : type === 'expense' ? '#f59e0b' : '#ef4444';
-  t.style.color = '#0f172a';
-  t.classList.remove('hidden');
-  t.classList.add('toast-enter');
-  setTimeout(() => { t.classList.add('hidden'); t.classList.remove('toast-enter'); }, 2500);
-}
-
-// Init icons
-lucide.createIcons();
 </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9f16c4e231c397a4',t:'MTc3NzA1MTEyNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-  <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js')
-    .then(() => {
-      console.log('Service Worker installed successfully');
-    })
-    .catch((err) => {
-      console.log('Service Worker failed:', err);
-    });
-}
-</script>
+
 </body>
 </html>
